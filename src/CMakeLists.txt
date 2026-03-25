@@ -1572,8 +1572,8 @@ pico_generate_pio_header(joypad_n642usb ${CMAKE_CURRENT_LIST_DIR}/lib/joybus-pio
 add_executable(joypad_nuon2usb)
 target_compile_definitions(joypad_nuon2usb PRIVATE CONFIG_NUON2USB=1 CONFIG_USB=1 DISABLE_USB_HOST=1 CONFIG_NO_NEOPIXEL=1
     PICO_DEFAULT_UART=0
-    PICO_DEFAULT_UART_TX_PIN=12
-    PICO_DEFAULT_UART_RX_PIN=13
+    PICO_DEFAULT_UART_TX_PIN=0
+    PICO_DEFAULT_UART_RX_PIN=1
 )
 target_sources(joypad_nuon2usb PUBLIC ${CORE_SOURCES} ${USB_DEVICE_SOURCES}
     ${CMAKE_CURRENT_SOURCE_DIR}/native/device/nuon/nuon_device.c
@@ -1589,6 +1589,7 @@ joypad_target_common(joypad_nuon2usb)
 pico_generate_pio_header(joypad_nuon2usb ${CMAKE_CURRENT_LIST_DIR}/native/device/nuon/polyface_read.pio)
 pico_generate_pio_header(joypad_nuon2usb ${CMAKE_CURRENT_LIST_DIR}/native/device/nuon/polyface_send.pio)
 pico_generate_pio_header(joypad_nuon2usb ${CMAKE_CURRENT_LIST_DIR}/apps/nuon2usb/polyface_host_send.pio)
+pico_generate_pio_header(joypad_nuon2usb ${CMAKE_CURRENT_LIST_DIR}/apps/nuon2usb/polyface_host_read.pio)
 pico_generate_pio_header(joypad_nuon2usb ${CMAKE_CURRENT_LIST_DIR}/apps/nuon2usb/polyface_clock.pio)
 
 # --- GC2USB (GameCube -> USB HID) ---

@@ -15,6 +15,7 @@
 #include "usb/usbd/usbd.h"
 #include "polyface_clock.pio.h"
 #include "polyface_host_send.pio.h"
+#include "polyface_host_read.pio.h"
 #include "pico/bootrom.h"
 #include "pico/stdio.h"
 #include "hardware/clocks.h"
@@ -68,7 +69,9 @@ static inline void __no_inline_not_in_flash_func(pf_read)(uint32_t *w0, uint32_t
     *w1 = pio_sm_get(pio, sm2);
 }
 
-// Send command and wait for device response (ctrl=0). Skip echoes (ctrl=1).
+// Send command and wait for device response.
+// The host read PIO only triggers on start(1)+control(0), so it ignores
+// our echoes (ctrl=1) and idle packets entirely. Returns a single 32-bit word.
 static uint32_t __no_inline_not_in_flash_func(pf_transact)(
     uint8_t dataA, uint8_t dataS, uint8_t dataC)
 {
@@ -76,53 +79,22 @@ static uint32_t __no_inline_not_in_flash_func(pf_transact)(
 
     absolute_time_t timeout = make_timeout_time_ms(50);
     while (!time_reached(timeout)) {
-        if (pio_sm_get_rx_fifo_level(pio, sm2) < 2) {
-            tight_loop_contents();
-            continue;
-        }
-        uint32_t w0 = pio_sm_get(pio, sm2);
-        uint32_t w1 = pio_sm_get(pio, sm2);
-        busy_wait_us(500);
-        if ((w0 & 1) == 0) return w1;
+        if (!pio_sm_is_rx_fifo_empty(pio, sm2))
+            return pio_sm_get(pio, sm2);  // Single word — device response data
+        tight_loop_contents();
     }
     return 0;
 }
 
-// Read an analog axis: sends CHANNEL + ANALOG, handles all echoes.
-// Returns the CRC-encoded value. Extract with (resp >> 24) & 0xFF.
-static uint32_t __no_inline_not_in_flash_func(pf_read_analog)(uint8_t channel)
-{
-    // Send CHANNEL (no response) then ANALOG (has response).
-    // Both get queued in send PIO TX FIFO and sent sequentially.
-    pf_put(0, 0x34, 0x01, channel);  // CHANNEL
-    pf_put(1, 0x35, 0x01, 0x00);     // ANALOG
-
-    // Read packets: expect CHANNEL echo, ANALOG echo, ANALOG response.
-    // Skip all ctrl=1 (echoes), return first ctrl=0 (response).
-    absolute_time_t timeout = make_timeout_time_ms(50);
-    while (!time_reached(timeout)) {
-        if (pio_sm_get_rx_fifo_level(pio, sm2) < 2) {
-            tight_loop_contents();
-            continue;
-        }
-        uint32_t w0 = pio_sm_get(pio, sm2);
-        uint32_t w1 = pio_sm_get(pio, sm2);
-        if ((w0 & 1) == 0) return w1;
-    }
-    return 0;
-}
-
-// Send command, drain echo, no response expected
+// Send command, no response expected. Wait for send to complete.
 static void __no_inline_not_in_flash_func(pf_send)(
     uint8_t type, uint8_t dataA, uint8_t dataS, uint8_t dataC)
 {
     pf_put(type, dataA, dataS, dataC);
-    // Wait for transmission to complete, then give device time to process
-    while (pio->sm[sm1].addr != 0) tight_loop_contents();
-    busy_wait_us(500);
-    // Drain echo
-    while (!pio_sm_is_rx_fifo_empty(pio, sm2))
-        (void)pio_sm_get(pio, sm2);
+    // Wait for send to complete (with timeout to prevent hang)
+    absolute_time_t send_timeout = make_timeout_time_ms(100);
+    while (pio->sm[sm1].addr != 0 && !time_reached(send_timeout))
+        tight_loop_contents();
 }
 
 static void __not_in_flash_func(host_core1)(void)
@@ -134,6 +106,22 @@ static void __not_in_flash_func(host_core1)(void)
         // ---- ENUMERATION ----
         bool enumerated = false;
         while (!enumerated) {
+            // Diagnostic: check clock and data line
+            static uint32_t retry_count = 0;
+            if ((retry_count++ % 10) == 0) {
+                int edges = 0;
+                bool last_c = gpio_get(CLKIN_PIN);
+                absolute_time_t te = make_timeout_time_ms(5);
+                while (!time_reached(te)) {
+                    bool c = gpio_get(CLKIN_PIN);
+                    if (c != last_c) { edges++; last_c = c; }
+                }
+                printf("[enum] clk=%d dat=%d rx=%d retry=%lu\n",
+                       edges, gpio_get(DATAIO_PIN),
+                       pio_sm_get_rx_fifo_level(pio, sm2),
+                       (unsigned long)retry_count);
+            }
+
             pf_send(0, 0xB1, 0x00, 0x00);  // RESET
             busy_wait_us(1000);
 
@@ -155,10 +143,10 @@ static void __not_in_flash_func(host_core1)(void)
 
             pf_send(0, 0xB4, 0x00, 0x00);  // BRAND id=0
 
-            // Read device MODE to learn capabilities
-            uint32_t mode_resp = pf_read_analog(0x00);  // CHANNEL=NONE → MODE
-            uint8_t device_mode = (mode_resp >> 24) & 0xFF;
-            printf("[nuon2usb] MODE=0x%02X\n", device_mode);
+            // Read device MODE
+            pf_send(0, 0x34, 0x01, 0x00);  // CHANNEL = NONE
+            uint32_t mode_resp = pf_transact(0x35, 0x01, 0x00);  // ANALOG → MODE
+            printf("[nuon2usb] MODE=0x%02X\n", (mode_resp >> 24) & 0xFF);
 
             enumerated = true;
             printf("[nuon2usb] Enumerated\n");
@@ -167,12 +155,6 @@ static void __not_in_flash_func(host_core1)(void)
         // ---- POLLING LOOP ----
         uint8_t disconnect_count = 0;
         while (disconnect_count < 30) {
-            // Drain any stale data (read all complete packets)
-            while (pio_sm_get_rx_fifo_level(pio, sm2) >= 2) {
-                (void)pio_sm_get(pio, sm2);
-                (void)pio_sm_get(pio, sm2);
-            }
-
             // Buttons
             uint32_t btn_resp = pf_transact(0x30, 0x02, 0x00);
             if (btn_resp == 0) { disconnect_count++; continue; }
@@ -317,15 +299,23 @@ void app_init(void)
     };
     profile_init(&profile_cfg);
 
-    // Pull-DOWN on data pin — keeps line solidly LOW between packets.
-    // Prevents floating pin from generating spurious start bits on the device side.
-    gpio_pull_down(DATAIO_PIN);
+    // Pull-UP on data pin — required for real controllers (open-drain protocol).
+    // KB2040-to-KB2040 loopback works without it (PIO is push-pull), but real
+    // controllers release the line and need pull-up to provide HIGH level.
+    gpio_pull_up(DATAIO_PIN);
 
-    // Replace device send PIO (control=0) with host send PIO (control=1)
+    // Replace BOTH device PIOs with host versions
     pio_sm_set_enabled(pio, sm1, false);
+    pio_sm_set_enabled(pio, sm2, false);
     pio_remove_program(pio, &polyface_send_program, 0);
+    pio_remove_program(pio, &polyface_read_program, 32 - polyface_read_program.length);
+
+    // Load host send (control=1) and host read (detects ctrl=0 responses only)
     uint off_host_send = pio_add_program(pio, &polyface_host_send_program);
     polyface_host_send_program_init(pio, sm1, off_host_send, DATAIO_PIN);
+    uint off_host_read = pio_add_program(pio, &polyface_host_read_program);
+    polyface_host_read_program_init(pio, sm2, off_host_read, DATAIO_PIN);
+    printf("[app:nuon2usb] PIO0: host_send@%d host_read@%d\n", off_host_send, off_host_read);
 
     // Start clock on PIO1 at 1MHz
     PIO pio_clk = pio1;

@@ -157,6 +157,7 @@ APP_wifi2usb_pico2_w := pico2_w wifi2usb wifi2usb_pico2_w WiFi USB
 APP_snes2usb_kb2040 := kb2040 snes2usb snes2usb_kb2040 SNES USB
 APP_n642usb_kb2040 := kb2040 n642usb n642usb_kb2040 N64 USB
 APP_nuon2usb_kb2040 := kb2040 nuon2usb nuon2usb_kb2040 Nuon USB
+APP_nuon2usb_pico_w := pico_w nuon2usb nuon2usb_pico_w Nuon USB
 APP_gc2usb_kb2040 := kb2040 gc2usb gc2usb_kb2040 GameCube USB
 APP_neogeo2usb_kb2040 := kb2040 neogeo2usb neogeo2usb_kb2040 NEOGEO USB
 APP_neogeo2usb_rp2040zero := rp2040zero neogeo2usb_rp2040zero neogeo2usb_rp2040zero NEOGEO USB
@@ -811,6 +812,10 @@ n642usb_kb2040:
 nuon2usb_kb2040:
 	$(call build_app,nuon2usb_kb2040)
 
+.PHONY: nuon2usb_pico_w
+nuon2usb_pico_w:
+	$(call build_app,nuon2usb_pico_w)
+
 .PHONY: gc2usb_kb2040
 gc2usb_kb2040:
 	$(call build_app,gc2usb_kb2040)
@@ -1152,6 +1157,10 @@ flash-n642usb_kb2040:
 .PHONY: flash-nuon2usb_kb2040
 flash-nuon2usb_kb2040:
 	@$(MAKE) --no-print-directory _flash_app APP_NAME=nuon2usb_kb2040
+
+.PHONY: flash-nuon2usb_pico_w
+flash-nuon2usb_pico_w:
+	@$(MAKE) --no-print-directory _flash_app APP_NAME=nuon2usb_pico_w
 
 .PHONY: flash-gc2usb_kb2040
 flash-gc2usb_kb2040:
