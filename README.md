@@ -14,6 +14,7 @@
   Build controller adapters, custom controllers, and assistive input devices — <br>on microcontrollers, not computers.
 </p>
 <p align="center">
+  <a href="https://github.com/joypad-ai/joypad-os/releases"><img src="https://img.shields.io/github/downloads/joypad-ai/joypad-os/total?style=for-the-badge&label=Downloads" alt="Downloads" /></a>
   <a href="https://github.com/joypad-ai/joypad-os/blob/main/LICENSE"><img src="https://img.shields.io/github/license/joypad-ai/joypad-os?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/joypad-ai/joypad-os/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/joypad-ai/joypad-os/.github/workflows/build.yml?style=for-the-badge" alt="CI Status" /></a>
   <a href="https://docs.joypad.ai/"><img src="https://img.shields.io/badge/Docs-docs.joypad.ai-blue?style=for-the-badge" alt="Documentation" /></a>
