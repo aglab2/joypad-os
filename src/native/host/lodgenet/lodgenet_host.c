@@ -1,19 +1,17 @@
 // lodgenet_host.c - LodgeNet Controller Host Driver
 //
-// Implements the proprietary LodgeNet serial protocol to read N64 and
-// GameCube hotel gaming controllers. Protocol reverse-engineered from
-// HoriGC_Trimmed.SFC (SNES-based controller tester ROM).
+// PIO-based implementation of the LodgeNet proprietary serial protocol.
+// Supports MCU protocol (N64/GC controllers) and SR protocol (SNES controllers)
+// with auto-detection between them.
 //
-// Protocol summary:
-//   3-wire: +5V, CLOCK (host out), DATA (controller out), GND
-//   Frame: double-strobe start + 64 data bits clocked on falling edge
-//   Data: 8 bytes — buttons(2) + sticks(4) + triggers(2)
-//   Rate: polled at 60Hz, ~3.4ms per frame, ~20kHz clock
+// Reference: lodgenet-gc-adapter-rp2040 (PIO, all 3 controller types)
 
 #include "lodgenet_host.h"
+#include "lodgenet.pio.h"
 #include "core/router/router.h"
 #include "core/input_event.h"
 #include "core/buttons.h"
+#include "hardware/pio.h"
 #include "hardware/gpio.h"
 #include "hardware/timer.h"
 #include <stdio.h>
@@ -25,286 +23,214 @@
 static bool initialized = false;
 static uint8_t pin_clock;
 static uint8_t pin_data;
+static uint8_t pin_clock2;
+static uint8_t pin_vcc;
 
-// Connection tracking
+// PIO resources — single SM, programs swapped on protocol change
+static PIO pio_hw;
+static uint pio_sm;
+static uint pio_offset;
+static const pio_program_t *current_program = NULL;
+
+// Protocol and device state
+typedef enum {
+    PROTO_MCU,   // N64/GC microcontroller
+    PROTO_SR,    // SNES shift register
+} proto_mode_t;
+
+static proto_mode_t proto = PROTO_MCU;
+static lodgenet_device_t device_type = LODGENET_DEVICE_NONE;
+
+// Connection tracking — matches reference exactly
 static bool connected = false;
-static uint32_t last_valid_ms = 0;
-static uint8_t disconnect_count = 0;
-#define DISCONNECT_THRESHOLD 30   // Require N consecutive failures before disconnect
+static uint8_t fail_count = 0;
+static uint8_t good_count = 0;
 
-// Change detection
-static uint32_t prev_buttons = 0xFFFFFFFF;
-static uint32_t prev_analog = 0xFFFFFFFF;
+// MCU encoded d-pad state (for virtual button detection)
+static uint8_t last_dpad = 0;
+static uint8_t last_menu = 0;
 
-// Calibration (analog center values captured at startup)
-static bool calibrated = false;
-static uint8_t cal_lx, cal_ly, cal_rx, cal_ry;
+// Poll throttle
+static uint32_t last_poll_us = 0;
+#define MCU_POLL_INTERVAL_US 16000  // ~60Hz for N64/GC
+#define SR_POLL_INTERVAL_US  7620   // ~131Hz for SNES (matches reference: (8ms*1000-380)/1)
 
-// Raw frame data from controller
-static uint8_t frame[8];
+// N64 stick scaling
+#define N64_STICK_MAX 80
 
 // ============================================================================
-// PROTOCOL IMPLEMENTATION
+// PIO PROTOCOL MANAGEMENT — matches reference load_mcu/sr_protocol()
 // ============================================================================
 
-// Read one complete 64-bit frame from the controller.
-// Returns true if data was received (DATA line not stuck high/low).
-static bool lodgenet_read_frame(uint8_t out[8])
+static void load_mcu_protocol(void)
 {
-    // ── Init strobe: double-pulse start signal ──
-    // Pattern: LOW(6.7µs) HIGH(6.0µs) LOW(6.7µs) HIGH(22.8µs settling)
-    // This tells the controller/adapter to latch its state.
+    pio_sm_set_enabled(pio_hw, pio_sm, false);
+    if (current_program)
+        pio_remove_program(pio_hw, current_program, pio_offset);
+    pio_offset = pio_add_program(pio_hw, &lodgenet_mcu_program);
+    current_program = &lodgenet_mcu_program;
+    lodgenet_mcu_pio_init(pio_hw, pio_sm, pio_offset, pin_clock, pin_data);
+    proto = PROTO_MCU;
+}
 
-    gpio_put(pin_clock, 0);
-    busy_wait_us(7);
-    gpio_put(pin_clock, 1);
-    busy_wait_us(6);
-    gpio_put(pin_clock, 0);
-    busy_wait_us(7);
-    gpio_put(pin_clock, 1);
-    busy_wait_us(23);
-
-    // ── Clock out 64 bits (8 bytes x 8 bits) ──
-    // Data sampled on falling edge, LSB first within each byte.
-    // Clock: ~26µs low, ~24µs high per bit.
-
-    uint8_t ones = 0;   // Track all-ones (no controller)
-    uint8_t zeros = 0;  // Track all-zeros (shorted/stuck)
-
-    for (int byte_idx = 0; byte_idx < 8; byte_idx++) {
-        uint8_t val = 0;
-
-        for (int bit = 0; bit < 8; bit++) {
-            // Falling edge — controller presents data
-            gpio_put(pin_clock, 0);
-            busy_wait_us(2);            // Data setup time
-
-            // Sample DATA line
-            uint8_t d = gpio_get(pin_data) ? 1 : 0;
-
-            // Shift in LSB first (matches original SNES ROR chain)
-            val = (val >> 1) | (d << 7);
-
-            busy_wait_us(24);           // Remainder of low phase
-
-            // Rising edge
-            gpio_put(pin_clock, 1);
-            busy_wait_us(24);           // High phase hold
-        }
-
-        out[byte_idx] = val;
-
-        if (val == 0xFF) ones++;
-        if (val == 0x00) zeros++;
-    }
-
-    // Leave clock high (idle state)
-    gpio_put(pin_clock, 1);
-
-    // Detect no-controller: all 0xFF (floating data with pull-up)
-    // or all 0x00 (shorted/stuck low)
-    if (ones == 8 || zeros == 8) {
-        return false;
-    }
-
-    return true;
+static void load_sr_protocol(void)
+{
+    pio_sm_set_enabled(pio_hw, pio_sm, false);
+    if (current_program)
+        pio_remove_program(pio_hw, current_program, pio_offset);
+    pio_offset = pio_add_program(pio_hw, &lodgenet_sr_program);
+    current_program = &lodgenet_sr_program;
+    lodgenet_sr_pio_init(pio_hw, pio_sm, pio_offset, pin_clock, pin_clock2, pin_data);
+    proto = PROTO_SR;
 }
 
 // ============================================================================
-// BUTTON MAPPING
+// MCU PROTOCOL — matches reference mcu_read() exactly
 // ============================================================================
 
-// Map LodgeNet controller data to JP_BUTTON_* format.
-//
-// Button bit assignments decoded from the test ROM's table-driven
-// diagnostic at $8962. The test ROM individually verifies each button
-// by checking for exactly one bit set while all others are released.
-//
-// Raw data is active-low (0 = pressed) and shifted LSB-first.
-// The caller inverts bytes (XOR $FF) before passing to this function,
-// so here 1 = pressed.
-//
-// Byte 0 ($3E in SNES ZP):
-//   bit 0: A button         (test sub 4: $3E == $01)
-//   bit 1: B button         (test sub 3: $3E == $02)
-//   bit 2: X button         (not individually tested — inferred position)
-//   bit 3: Start            (test sub 2: $3E == $08)
-//   bit 4: D-pad Up         (test sub 11: $3E == $10)
-//   bit 5: D-pad Down       (test sub 12: $3E == $20)
-//   bit 6: D-pad Left       (test sub 13: $3E == $40)
-//   bit 7: D-pad Right      (test sub 14: $3E == $80)
-//
-// Byte 1 ($40 in SNES ZP):
-//   bit 0: Y button         (not individually tested — inferred position)
-//   bit 1: (unknown)
-//   bit 2: Z trigger        (test sub 19: $40 == $84, i.e. bit2 + bit7)
-//   bit 3: (unknown)
-//   bit 4: R shoulder        (test sub 1: $40 == $90, i.e. bit4 + bit7)
-//   bit 5: L shoulder        (test sub 0: $40 == $A0, i.e. bit5 + bit7)
-//   bit 6: (unknown)
-//   bit 7: Always set        (connection indicator — not a button)
+static bool mcu_read(uint8_t *bytes, uint num_bytes, bool *is_gc)
+{
+    while (!pio_sm_is_rx_fifo_empty(pio_hw, pio_sm))
+        pio_sm_get(pio_hw, pio_sm);
 
-static uint32_t map_lodgenet_buttons(const uint8_t* data)
+    pio_sm_put(pio_hw, pio_sm, num_bytes * 8 - 1);
+
+    uint32_t timeout_us = num_bytes * 8 * 50 + 5000;
+    uint32_t start = time_us_32();
+
+    for (uint i = 0; i < num_bytes; i++) {
+        while (pio_sm_is_rx_fifo_empty(pio_hw, pio_sm)) {
+            if ((time_us_32() - start) > timeout_us) {
+                *is_gc = false;
+                return false;
+            }
+        }
+        bytes[i] = (uint8_t)(pio_sm_get(pio_hw, pio_sm));
+    }
+
+    bool has_mcu = (bytes[1] & 0x80) != 0;
+    *is_gc = (bytes[1] & 0x40) != 0;
+    bool forced_fail = *is_gc && (bytes[1] & 0x01);
+    return has_mcu && !forced_fail;
+}
+
+// ============================================================================
+// SR PROTOCOL — matches reference sr_read() exactly
+// ============================================================================
+
+static bool sr_read(uint16_t *value)
+{
+    while (!pio_sm_is_rx_fifo_empty(pio_hw, pio_sm))
+        pio_sm_get(pio_hw, pio_sm);
+
+    pio_sm_put(pio_hw, pio_sm, 15);
+
+    uint32_t timeout_us = 5000;
+    uint32_t start = time_us_32();
+
+    uint8_t raw[3] = {0};
+    for (int i = 0; i < 3; i++) {
+        while (pio_sm_is_rx_fifo_empty(pio_hw, pio_sm)) {
+            if ((time_us_32() - start) > timeout_us)
+                return false;
+        }
+        raw[i] = (uint8_t)(pio_sm_get(pio_hw, pio_sm));
+    }
+
+    *value = ((uint16_t)raw[0] << 8) | raw[1];
+
+    // Presence bit: LOW = controller present, HIGH = no controller
+    bool present = !(raw[2] & 0x01);
+    return present;
+}
+
+// ============================================================================
+// BUTTON MAPPING: MCU (N64/GC) — matches reference parse_mcu()
+// ============================================================================
+
+static void submit_mcu(uint8_t *bytes, bool is_gc)
 {
     uint32_t buttons = 0;
-    uint8_t b0 = data[0] ^ 0xFF;   // Invert (active low → active high)
-    uint8_t b1 = data[1] ^ 0xFF;
 
-    // Byte 0: Face buttons + D-pad
-    if (b0 & 0x01) buttons |= JP_BUTTON_B2;   // A → B2 (Switch A)
-    if (b0 & 0x02) buttons |= JP_BUTTON_B1;   // B → B1 (Switch B)
-    if (b0 & 0x04) buttons |= JP_BUTTON_B4;   // X → B4 (Switch X)
-    if (b0 & 0x08) buttons |= JP_BUTTON_S2;   // Start → S2 (Plus)
-    if (b0 & 0x10) buttons |= JP_BUTTON_DU;   // D-pad Up
-    if (b0 & 0x20) buttons |= JP_BUTTON_DD;   // D-pad Down
-    if (b0 & 0x40) buttons |= JP_BUTTON_DL;   // D-pad Left
-    if (b0 & 0x80) buttons |= JP_BUTTON_DR;   // D-pad Right
+    // Common buttons (N64 + GC shared)
+    if (!(bytes[0] & 0x20)) buttons |= JP_BUTTON_R1;   // Z
+    if (!(bytes[0] & 0x10)) buttons |= JP_BUTTON_S2;   // Start
+    if (!(bytes[1] & 0x20)) buttons |= JP_BUTTON_L2;   // L
+    if (!(bytes[1] & 0x10)) buttons |= JP_BUTTON_R2;   // R
 
-    // Byte 1: Shoulders + Z + Y (bit 7 ignored — always-on indicator)
-    if (b1 & 0x01) buttons |= JP_BUTTON_B3;   // Y → B3 (Switch Y)
-    if (b1 & 0x04) buttons |= JP_BUTTON_L2;   // Z → L2 (ZL trigger)
-    if (b1 & 0x10) buttons |= JP_BUTTON_R1;   // R shoulder → R1
-    if (b1 & 0x20) buttons |= JP_BUTTON_L1;   // L shoulder → L1
+    // Encoded d-pad / virtual LodgeNet buttons — matches reference exactly
+    uint8_t dpad = ~bytes[0] & 0x0F;
 
-    return buttons;
-}
-
-// ============================================================================
-// PUBLIC API
-// ============================================================================
-
-void lodgenet_host_init(void)
-{
-    if (initialized) return;
-    lodgenet_host_init_pins(LODGENET_PIN_CLOCK, LODGENET_PIN_DATA);
-}
-
-void lodgenet_host_init_pins(uint8_t clock, uint8_t data)
-{
-    printf("[lodgenet] Initializing LodgeNet host driver\n");
-    printf("[lodgenet]   CLOCK=%d, DATA=%d\n", clock, data);
-
-    pin_clock = clock;
-    pin_data = data;
-
-    // Clock: output, idle high
-    gpio_init(pin_clock);
-    gpio_set_dir(pin_clock, GPIO_OUT);
-    gpio_put(pin_clock, 1);
-
-    // Data: input with pull-up (floating = 1 when no controller)
-    gpio_init(pin_data);
-    gpio_set_dir(pin_data, GPIO_IN);
-    gpio_pull_up(pin_data);
-
-    initialized = true;
-    connected = false;
-    calibrated = false;
-    disconnect_count = 0;
-    prev_buttons = 0xFFFFFFFF;
-    prev_analog = 0xFFFFFFFF;
-
-    printf("[lodgenet] Initialization complete\n");
-}
-
-void lodgenet_host_task(void)
-{
-    if (!initialized) return;
-
-    uint32_t now_ms = time_us_32() / 1000;
-
-    // Read a frame
-    bool ok = lodgenet_read_frame(frame);
-
-    if (!ok) {
-        // No valid data — count toward disconnect
-        disconnect_count++;
-        if (disconnect_count >= DISCONNECT_THRESHOLD && connected) {
-            connected = false;
-            calibrated = false;
-            printf("[lodgenet] Controller disconnected\n");
-
-            // Send cleared event to release any stuck buttons
-            input_event_t event;
-            init_input_event(&event);
-            event.dev_addr = 0xF0;
-            event.type = INPUT_TYPE_GAMEPAD;
-            event.transport = INPUT_TRANSPORT_NATIVE;
-            router_submit_input(&event);
-            prev_buttons = 0;
-            prev_analog = 0;
+    uint8_t encoded_type = 0;
+    if ((dpad & 0x03) == 0x03 || (dpad & 0x0C) == 0x0C) {
+        if (last_dpad == 0) {
+            if (dpad == 0x0F) encoded_type = 1;  // Reset
+            if (dpad == 0x0C) encoded_type = 2;  // Menu
+            if (dpad == 0x03) encoded_type = 3;  // *
+            if (dpad == 0x0D) encoded_type = 4;  // Select
+            if (dpad == 0x0B) encoded_type = 5;  // Order
+            if (dpad == 0x0E) encoded_type = 6;  // #
+            if (last_menu == 0)
+                last_menu = encoded_type;
+            else if (last_menu != encoded_type)
+                encoded_type = last_menu;
         }
-        return;
+    } else {
+        last_dpad = dpad;
+        last_menu = 0;
     }
 
-    // Valid data received
-    disconnect_count = 0;
-    last_valid_ms = now_ms;
+    if (last_dpad & 0x08) buttons |= JP_BUTTON_DU;
+    if (last_dpad & 0x04) buttons |= JP_BUTTON_DD;
+    if (last_dpad & 0x02) buttons |= JP_BUTTON_DL;
+    if (last_dpad & 0x01) buttons |= JP_BUTTON_DR;
 
-    if (!connected) {
-        connected = true;
-        printf("[lodgenet] Controller connected\n");
+    if (encoded_type == 2) buttons |= JP_BUTTON_A1;   // Menu → Home
+    if (encoded_type == 4) buttons |= JP_BUTTON_S1;   // Select → Back
+
+    uint8_t stick_lx, stick_ly, stick_rx, stick_ry;
+    uint8_t trigger_l = 0, trigger_r = 0;
+
+    if (is_gc) {
+        if (!(bytes[0] & 0x40)) buttons |= JP_BUTTON_B2;  // A
+        if (!(bytes[0] & 0x80)) buttons |= JP_BUTTON_B1;  // B
+        if (!(bytes[1] & 0x04)) buttons |= JP_BUTTON_B4;  // X
+        if (!(bytes[1] & 0x08)) buttons |= JP_BUTTON_B3;  // Y
+
+        stick_lx = bytes[2];
+        stick_ly = 255 - bytes[3];
+        stick_rx = bytes[4];
+        stick_ry = 255 - bytes[5];
+        trigger_l = bytes[6];
+        trigger_r = bytes[7];
+        device_type = LODGENET_DEVICE_GC;
+    } else {
+        if (!(bytes[0] & 0x80)) buttons |= JP_BUTTON_B1;  // A
+        if (!(bytes[0] & 0x40)) buttons |= JP_BUTTON_B3;  // B
+        if (!(bytes[1] & 0x08)) buttons |= JP_BUTTON_L3;  // C-Up
+        if (!(bytes[1] & 0x04)) buttons |= JP_BUTTON_B2;  // C-Down
+        if (!(bytes[1] & 0x02)) buttons |= JP_BUTTON_B4;  // C-Left
+        if (!(bytes[1] & 0x01)) buttons |= JP_BUTTON_R3;  // C-Right
+
+        int8_t raw_x = (int8_t)bytes[2];
+        int8_t raw_y = (int8_t)bytes[3];
+        if (raw_x > N64_STICK_MAX) raw_x = N64_STICK_MAX;
+        if (raw_x < -N64_STICK_MAX) raw_x = -N64_STICK_MAX;
+        if (raw_y > N64_STICK_MAX) raw_y = N64_STICK_MAX;
+        if (raw_y < -N64_STICK_MAX) raw_y = -N64_STICK_MAX;
+
+        int32_t scaled_x = ((int32_t)raw_x * 127) / N64_STICK_MAX;
+        int32_t scaled_y = ((int32_t)raw_y * 127) / N64_STICK_MAX;
+        stick_lx = (uint8_t)(scaled_x + 128);
+        stick_ly = 255 - (uint8_t)(scaled_y + 128);
+
+        stick_rx = 128;
+        stick_ry = 128;
+        device_type = LODGENET_DEVICE_N64;
     }
 
-    // Calibrate analog center on first valid read
-    if (!calibrated) {
-        cal_lx = frame[2] ^ 0xFF;
-        cal_ly = frame[3] ^ 0xFF;
-        cal_rx = frame[4] ^ 0xFF;
-        cal_ry = frame[5] ^ 0xFF;
-        calibrated = true;
-        printf("[lodgenet] Calibrated center: LX=%d LY=%d RX=%d RY=%d\n",
-               cal_lx, cal_ly, cal_rx, cal_ry);
-    }
-
-    // Map buttons
-    uint32_t buttons = map_lodgenet_buttons(frame);
-
-    // Map analog axes (invert from active-low, center-calibrate, normalize to HID)
-    // Raw values are active-low, so invert first
-    uint8_t raw_lx = frame[2] ^ 0xFF;
-    uint8_t raw_ly = frame[3] ^ 0xFF;
-    uint8_t raw_rx = frame[4] ^ 0xFF;
-    uint8_t raw_ry = frame[5] ^ 0xFF;
-    uint8_t raw_lt = frame[6] ^ 0xFF;
-    uint8_t raw_rt = frame[7] ^ 0xFF;
-
-    // Center-calibrate sticks: subtract baseline, add 128
-    // Clamp to 0-255 range
-    int16_t lx = (int16_t)(raw_lx - cal_lx) + 128;
-    int16_t ly = (int16_t)(raw_ly - cal_ly) + 128;
-    int16_t rx = (int16_t)(raw_rx - cal_rx) + 128;
-    int16_t ry = (int16_t)(raw_ry - cal_ry) + 128;
-
-    if (lx < 0) lx = 0; if (lx > 255) lx = 255;
-    if (ly < 0) ly = 0; if (ly > 255) ly = 255;
-    if (rx < 0) rx = 0; if (rx > 255) rx = 255;
-    if (ry < 0) ry = 0; if (ry > 255) ry = 255;
-
-    // LodgeNet uses Nintendo convention (0=down/left?, 255=up/right?)
-    // Invert Y for HID convention: 0=up, 255=down
-    uint8_t stick_lx = (uint8_t)lx;
-    uint8_t stick_ly = 255 - (uint8_t)ly;
-    uint8_t stick_rx = (uint8_t)rx;
-    uint8_t stick_ry = 255 - (uint8_t)ry;
-
-    // Triggers are 0-255 (0 = released)
-    uint8_t trigger_l = raw_lt;
-    uint8_t trigger_r = raw_rt;
-
-    // Only submit if state changed
-    uint32_t analog_packed = ((uint32_t)stick_lx << 24) | ((uint32_t)stick_ly << 16) |
-                             ((uint32_t)stick_rx << 8) | stick_ry;
-    if (buttons == prev_buttons && analog_packed == prev_analog) {
-        return;
-    }
-    prev_buttons = buttons;
-    prev_analog = analog_packed;
-
-    // Build and submit input event
     input_event_t event;
     init_input_event(&event);
-
     event.dev_addr = 0xF0;
     event.instance = 0;
     event.type = INPUT_TYPE_GAMEPAD;
@@ -317,13 +243,221 @@ void lodgenet_host_task(void)
     event.analog[ANALOG_RY] = stick_ry;
     event.analog[ANALOG_L2] = trigger_l;
     event.analog[ANALOG_R2] = trigger_r;
-
     router_submit_input(&event);
+}
+
+// ============================================================================
+// BUTTON MAPPING: SR (SNES) — matches reference parse_snes() exactly
+// ============================================================================
+
+static void submit_snes(uint16_t value)
+{
+    // LODG: M O B Y S * ↑ ↓ 1 1 ← → A X L R
+    //       15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+    uint32_t buttons = 0;
+
+    if (!(value & 0x2000)) buttons |= JP_BUTTON_B1;  // B
+    if (!(value & 0x0008)) buttons |= JP_BUTTON_B2;  // A
+    if (!(value & 0x1000)) buttons |= JP_BUTTON_B3;  // Y
+    if (!(value & 0x0004)) buttons |= JP_BUTTON_B4;  // X
+    if (!(value & 0x0800)) buttons |= JP_BUTTON_S1;  // Select
+    if (!(value & 0x0400)) buttons |= JP_BUTTON_S2;  // Start
+    if (!(value & 0x0002)) buttons |= JP_BUTTON_L1;  // L
+    if (!(value & 0x0001)) buttons |= JP_BUTTON_R1;  // R
+
+    // D-pad with SOCD detection
+    bool raw_up    = !(value & 0x0200);
+    bool raw_down  = !(value & 0x0100);
+    bool raw_left  = !(value & 0x0020);
+    bool raw_right = !(value & 0x0010);
+
+    bool ln_minus = raw_up && raw_down;
+    bool ln_plus  = raw_left && raw_right;
+
+    if (!ln_minus) {
+        if (raw_up)   buttons |= JP_BUTTON_DU;
+        if (raw_down) buttons |= JP_BUTTON_DD;
+    }
+    if (!ln_plus) {
+        if (raw_left)  buttons |= JP_BUTTON_DL;
+        if (raw_right) buttons |= JP_BUTTON_DR;
+    }
+
+    // LodgeNet system buttons
+    if (!(value & 0x8000)) buttons |= JP_BUTTON_A1;  // Menu → Home
+    if (!(value & 0x4000)) buttons |= JP_BUTTON_A2;  // Order → Capture
+    if (ln_minus) buttons |= JP_BUTTON_A3;  // Minus
+    if (ln_plus)  buttons |= JP_BUTTON_A4;  // Plus
+
+    device_type = LODGENET_DEVICE_SNES;
+
+    input_event_t event;
+    init_input_event(&event);
+    event.dev_addr = 0xF0;
+    event.instance = 0;
+    event.type = INPUT_TYPE_GAMEPAD;
+    event.transport = INPUT_TRANSPORT_NATIVE;
+    event.layout = LAYOUT_MODERN_4FACE;
+    event.buttons = buttons;
+    event.analog[ANALOG_LX] = 128;
+    event.analog[ANALOG_LY] = 128;
+    router_submit_input(&event);
+}
+
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+void lodgenet_host_init(void)
+{
+    if (initialized) return;
+    lodgenet_host_init_pins(LODGENET_PIN_CLOCK, LODGENET_PIN_DATA,
+                            LODGENET_PIN_CLOCK2, LODGENET_PIN_VCC);
+}
+
+void lodgenet_host_init_pins(uint8_t clock, uint8_t data, uint8_t clock2, uint8_t vcc)
+{
+    printf("[lodgenet] init CLK=%d DATA=%d CLK2=%d VCC=%d\n", clock, data, clock2, vcc);
+
+    pin_clock = clock;
+    pin_data = data;
+    pin_clock2 = clock2;
+    pin_vcc = vcc;
+
+    // VCC: output, drive HIGH to power controller
+    gpio_init(pin_vcc);
+    gpio_set_dir(pin_vcc, GPIO_OUT);
+    gpio_put(pin_vcc, 1);
+
+    // Clock: output, idle high, pull-up
+    gpio_init(pin_clock);
+    gpio_pull_up(pin_clock);
+    gpio_set_dir(pin_clock, GPIO_OUT);
+    gpio_put(pin_clock, 1);
+
+    // Data: input with pull-up
+    gpio_init(pin_data);
+    gpio_pull_up(pin_data);
+    gpio_set_dir(pin_data, GPIO_IN);
+
+    // Clock2: output, idle high, pull-up
+    gpio_init(pin_clock2);
+    gpio_pull_up(pin_clock2);
+    gpio_set_dir(pin_clock2, GPIO_OUT);
+    gpio_put(pin_clock2, 1);
+
+    // Claim PIO SM — with CONFIG_NO_NEOPIXEL, SM0 is free (matching reference)
+    pio_hw = pio0;
+    pio_sm = pio_claim_unused_sm(pio_hw, true);
+
+    // Start with MCU protocol
+    current_program = NULL;
+    load_mcu_protocol();
+
+    initialized = true;
+    connected = false;
+    device_type = LODGENET_DEVICE_NONE;
+    fail_count = 0;
+    good_count = 0;
+    last_dpad = 0;
+    last_menu = 0;
+
+    printf("[lodgenet] ready PIO%d SM%d\n", pio_get_index(pio_hw), pio_sm);
+}
+
+// ============================================================================
+// TASK — matches reference joybus_itf_poll() flow exactly
+// ============================================================================
+
+void lodgenet_host_task(void)
+{
+    if (!initialized) return;
+
+    // SR protocol — throttled to ~125Hz (matching reference framework interval)
+    if (proto == PROTO_SR) {
+        uint32_t now_sr = time_us_32();
+        if ((now_sr - last_poll_us) < SR_POLL_INTERVAL_US)
+            return;
+        last_poll_us = now_sr;
+        uint16_t snes_value = 0;
+        bool snes_present = sr_read(&snes_value);
+
+        if (snes_present) {
+            fail_count = 0;
+            if (!connected) {
+                connected = true;
+                printf("[lodgenet] SNES connected\n");
+            }
+            submit_snes(snes_value);
+        } else if (++fail_count >= 5) {
+            if (connected) {
+                connected = false;
+                device_type = LODGENET_DEVICE_NONE;
+                // Send cleared event
+                input_event_t event;
+                init_input_event(&event);
+                event.dev_addr = 0xF0;
+                event.type = INPUT_TYPE_GAMEPAD;
+                event.transport = INPUT_TRANSPORT_NATIVE;
+                router_submit_input(&event);
+            }
+            load_mcu_protocol();
+            fail_count = 0;
+            good_count = 0;
+        }
+        return;
+    }
+
+    // MCU protocol — throttled to ~60Hz
+    uint32_t now = time_us_32();
+    if ((now - last_poll_us) < MCU_POLL_INTERVAL_US)
+        return;
+    last_poll_us = now;
+
+    uint8_t bytes[10];
+    bool is_gc = false;
+    bool valid = mcu_read(bytes, 10, &is_gc);
+
+    if (valid) {
+        proto = PROTO_MCU;
+        fail_count = 0;
+        if (++good_count >= 15) {
+            if (!connected) {
+                connected = true;
+                printf("[lodgenet] %s connected\n", is_gc ? "GC" : "N64");
+            }
+            submit_mcu(bytes, is_gc);
+        }
+    } else {
+        good_count = 0;
+        if (++fail_count >= 5) {
+            if (connected) {
+                connected = false;
+                device_type = LODGENET_DEVICE_NONE;
+                input_event_t event;
+                init_input_event(&event);
+                event.dev_addr = 0xF0;
+                event.type = INPUT_TYPE_GAMEPAD;
+                event.transport = INPUT_TRANSPORT_NATIVE;
+                router_submit_input(&event);
+                last_dpad = 0;
+                last_menu = 0;
+            }
+            load_sr_protocol();
+            fail_count = 0;
+            good_count = 0;
+        }
+    }
 }
 
 bool lodgenet_host_is_connected(void)
 {
     return initialized && connected;
+}
+
+lodgenet_device_t lodgenet_host_get_device_type(void)
+{
+    return device_type;
 }
 
 // ============================================================================

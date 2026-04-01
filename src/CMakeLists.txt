@@ -264,6 +264,11 @@ set(GC_HOST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/joybus-pio/src/GamecubeController.c
 )
 
+# LodgeNet host sources
+set(LODGENET_HOST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/native/host/lodgenet/lodgenet_host.c
+)
+
 # Nuon host sources (polyface master)
 # TODO: uncomment when nuon_host.c is implemented
 # set(NUON_HOST_SOURCES
@@ -1664,6 +1669,23 @@ target_include_directories(joypad_nes2usb PUBLIC
 target_link_libraries(joypad_nes2usb PRIVATE pico_stdlib pico_multicore hardware_pio pico_rand tinyusb_device tinyusb_board)
 joypad_target_common(joypad_nes2usb)
 pico_generate_pio_header(joypad_nes2usb ${CMAKE_CURRENT_LIST_DIR}/native/host/nes/nes_host.pio)
+
+
+# --- LODGENET2USB (LodgeNet -> USB HID) ---
+add_executable(joypad_lodgenet2usb)
+target_compile_definitions(joypad_lodgenet2usb PRIVATE CONFIG_LODGENET2USB=1 CONFIG_USB=1 DISABLE_USB_HOST=1 CONFIG_NO_NEOPIXEL=1)
+target_sources(joypad_lodgenet2usb PUBLIC ${CORE_SOURCES} ${USB_DEVICE_SOURCES}
+    ${LODGENET_HOST_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/apps/lodgenet2usb/app.c
+)
+target_include_directories(joypad_lodgenet2usb PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/apps/lodgenet2usb
+    ${CMAKE_CURRENT_SOURCE_DIR}/usb/usbd
+    ${CMAKE_CURRENT_SOURCE_DIR}/native/host/lodgenet
+)
+target_link_libraries(joypad_lodgenet2usb PRIVATE pico_stdlib pico_multicore hardware_pio pico_rand tinyusb_device tinyusb_board)
+joypad_target_common(joypad_lodgenet2usb)
+pico_generate_pio_header(joypad_lodgenet2usb ${CMAKE_CURRENT_LIST_DIR}/native/host/lodgenet/lodgenet.pio)
 
 
 # ============================================================================

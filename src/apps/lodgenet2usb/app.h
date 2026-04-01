@@ -38,8 +38,10 @@
 //   RJ11 Pin 2: CLOCK → GPIO output
 //   RJ11 Pin 3: DATA  → GPIO input
 //   RJ11 Pin 4: GND
-#define LODGENET_PIN_CLOCK  5   // Clock output to controller
-#define LODGENET_PIN_DATA   7   // Data input from controller
+#define LODGENET_PIN_CLOCK  3   // CLK1 output to controller
+#define LODGENET_PIN_DATA   2   // Data input from controller
+#define LODGENET_PIN_VCC    4   // VCC output (drives controller power)
+#define LODGENET_PIN_CLOCK2 5   // CLK2 output (SNES SR protocol only)
 
 // ============================================================================
 // ROUTING CONFIGURATION
@@ -57,7 +59,7 @@
 // ============================================================================
 // HARDWARE CONFIGURATION
 // ============================================================================
-#define BOARD "ada_kb2040"
+#define BOARD "rpi_pico"
 #define CPU_OVERCLOCK_KHZ 0
 #define UART_DEBUG 1
 

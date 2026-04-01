@@ -96,6 +96,7 @@ CONSOLE_nes2usb := joypad_nes2usb
 CONSOLE_n642usb := joypad_n642usb
 CONSOLE_nuon2usb := joypad_nuon2usb
 CONSOLE_gc2usb := joypad_gc2usb
+CONSOLE_lodgenet2usb := joypad_lodgenet2usb
 CONSOLE_neogeo2usb := joypad_neogeo2usb
 CONSOLE_neogeo2usb_rp2040zero := joypad_neogeo2usb_rp2040zero
 CONSOLE_controller_fisherprice_v1 := joypad_controller_fisherprice_v1
@@ -159,6 +160,7 @@ APP_n642usb_kb2040 := kb2040 n642usb n642usb_kb2040 N64 USB
 APP_nuon2usb_kb2040 := kb2040 nuon2usb nuon2usb_kb2040 Nuon USB
 APP_nuon2usb_pico_w := pico_w nuon2usb nuon2usb_pico_w Nuon USB
 APP_gc2usb_kb2040 := kb2040 gc2usb gc2usb_kb2040 GameCube USB
+APP_lodgenet2usb_pico := pico lodgenet2usb lodgenet2usb_pico LodgeNet USB
 APP_neogeo2usb_kb2040 := kb2040 neogeo2usb neogeo2usb_kb2040 NEOGEO USB
 APP_neogeo2usb_rp2040zero := rp2040zero neogeo2usb_rp2040zero neogeo2usb_rp2040zero NEOGEO USB
 APP_controller_fisherprice_v1_kb2040 := kb2040 controller_fisherprice_v1 controller_fisherprice_v1_kb2040 GPIO USB
@@ -274,6 +276,7 @@ help:
 
 	@echo "  make nes2usb_kb2040     - NES -> USB HID (KB2040)"
 	@echo "  make nes2usb_pico_w     - NES -> USB HID (Pico W)"
+	@echo "  make lodgenet2usb_pico   - LodgeNet -> USB HID (Pico)"
 	@echo ""
 	@echo "$(GREEN)Convenience Targets:$(NC)"
 	@echo "  make all           - Build all apps"
@@ -865,6 +868,10 @@ nes2usb_kb2040:
 nes2usb_pico_w:
 	$(call build_app,nes2usb_pico_w)
 
+.PHONY: lodgenet2usb_pico
+lodgenet2usb_pico:
+	$(call build_app,lodgenet2usb_pico)
+
 # Console-only targets (defaults to KB2040)
 .PHONY: 3do
 3do:
@@ -1210,6 +1217,10 @@ flash-nes2usb_kb2040:
 .PHONY: flash-nes2usb_pico_w
 flash-nes2usb_pico_w:
 	@$(MAKE) --no-print-directory _flash_app APP_NAME=nes2usb_pico_w
+
+.PHONY: flash-lodgenet2usb_pico
+flash-lodgenet2usb_pico:
+	@$(MAKE) --no-print-directory _flash_app APP_NAME=lodgenet2usb_pico
 
 # Internal flash helper for specific app (finds most recent matching file)
 .PHONY: _flash_app

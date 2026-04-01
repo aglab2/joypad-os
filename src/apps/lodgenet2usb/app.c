@@ -51,7 +51,8 @@ void app_init(void)
     printf("[app:lodgenet2usb] Initializing LodgeNet2USB v%s\n", APP_VERSION);
 
     // Initialize LodgeNet host driver
-    lodgenet_host_init_pins(LODGENET_PIN_CLOCK, LODGENET_PIN_DATA);
+    lodgenet_host_init_pins(LODGENET_PIN_CLOCK, LODGENET_PIN_DATA,
+                            LODGENET_PIN_CLOCK2, LODGENET_PIN_VCC);
 
     // Configure router for LodgeNet -> USB routing
     router_config_t router_cfg = {
