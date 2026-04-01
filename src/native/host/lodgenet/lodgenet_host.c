@@ -204,7 +204,7 @@ static void submit_mcu(uint8_t *bytes, bool is_gc)
         trigger_l = bytes[6];
         trigger_r = bytes[7];
         device_type = LODGENET_DEVICE_GC;
-    } else {
+    } else { // N64
         if (!(bytes[0] & 0x80)) buttons |= JP_BUTTON_B1;  // A
         if (!(bytes[0] & 0x40)) buttons |= JP_BUTTON_B3;  // B
         if (!(bytes[1] & 0x08)) buttons |= JP_BUTTON_L3;  // C-Up
@@ -235,7 +235,7 @@ static void submit_mcu(uint8_t *bytes, bool is_gc)
     event.instance = 0;
     event.type = INPUT_TYPE_GAMEPAD;
     event.transport = INPUT_TRANSPORT_NATIVE;
-    event.layout = LAYOUT_MODERN_4FACE;
+    event.layout = is_gc ? LAYOUT_GAMECUBE : LAYOUT_NINTENDO_N64;
     event.buttons = buttons;
     event.analog[ANALOG_LX] = stick_lx;
     event.analog[ANALOG_LY] = stick_ly;
@@ -297,7 +297,7 @@ static void submit_snes(uint16_t value)
     event.instance = 0;
     event.type = INPUT_TYPE_GAMEPAD;
     event.transport = INPUT_TRANSPORT_NATIVE;
-    event.layout = LAYOUT_MODERN_4FACE;
+    event.layout = LAYOUT_NINTENDO_4FACE;
     event.buttons = buttons;
     event.analog[ANALOG_LX] = 128;
     event.analog[ANALOG_LY] = 128;
