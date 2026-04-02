@@ -16,7 +16,7 @@ No PIO state machines or overclock required. The adapter enumerates as a composi
 
 - **Double-click** the board button to cycle through primary modes
 - **Triple-click** to reset to SInput (default)
-- Mode can also be changed via CDC command (`MODE.SET`) or [web config](../features/web-config.md)
+- Mode can also be changed via CDC command (`MODE.SET`) or [web config](../core/web-config.md)
 - Switching triggers USB re-enumeration (brief disconnect)
 - Selected mode persists to flash
 

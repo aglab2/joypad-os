@@ -68,7 +68,31 @@ The SNESpad library detects device presence based on the data line response. An 
 
 ## Feedback
 
-- **Rumble**: Supported via LRG protocol on compatible controllers. `snes_host_set_rumble()` accepts left/right motor values (0-255, scaled internally to 0-15).
+- **Rumble**: Supported via the LRG (Limited Run Games) SNES Rumble protocol on compatible controllers. `snes_host_set_rumble()` accepts left/right motor values (0-255, scaled internally to 0-15).
+
+### LRG Rumble Protocol
+
+The rumble protocol piggybacks on the existing controller clock signal. On each clock pulse (same pulses used to read button data), the host drives IOBit (pin 6) with a bit from a 16-bit frame. The controller shifts these bits into a register. When the high byte matches `0x72`, the low byte is interpreted as a rumble command.
+
+```
+Bit:  15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+       0  1  1  1  0  0  1  0 |R3 R2 R1 R0|L3 L2 L1 L0|
+       -------- 0x72 --------|-- Right ---|--- Left ---|
+```
+
+- Data clocked out MSB first, one bit per clock pulse
+- Frame detection: `(shift_register & 0xFF00) == 0x7200`
+- Right motor intensity: high nibble (0-15)
+- Left motor intensity: low nibble (0-15)
+
+**Compatibility:**
+
+- Standard SNES controllers: Unaffected (pin 6 not wired)
+- NES controllers: Unaffected (no pin 6)
+- SNES Mouse: Uses IOBit for speed cycling -- rumble disabled when mouse detected
+- Xband Keyboard: Uses IOBit for caps lock LED -- rumble disabled when keyboard detected
+
+References: Mesen2 `SnesRumbleController.cpp`, [LRG SNES Rumble repo](https://github.com/LimitedRunGames-Tech/snes-rumble)
 
 ## Configuration
 

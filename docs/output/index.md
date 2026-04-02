@@ -44,7 +44,7 @@ typedef struct {
 
 ## USB Device Output Modes
 
-The USB device output supports 13 emulation modes, selectable at runtime via [web config](../features/web-config.md) or button combo:
+The USB device output supports 13 emulation modes, selectable at runtime via [web config](../core/web-config.md) or button combo:
 
 | Mode | Emulates | Console Auth |
 |------|----------|--------------|

@@ -72,6 +72,7 @@ nav:
     - Storage: core/storage.md
     - LEDs: core/leds.md
     - Platform HAL: core/platform-hal.md
+    - Web Config: core/web-config.md
   - Apps:
     - Overview: apps/index.md
     - Console Adapters:
@@ -127,9 +128,6 @@ nav:
     - PC Engine: protocols/PCENGINE.md
     - LodgeNet: protocols/lodgenet.md
     - SInput HID: protocols/sinput.md
-  - Features:
-    - Web Config: features/web-config.md
-    - SNES Rumble: features/SNES_RUMBLE.md
   - Development:
     - Contributing: development/index.md
 
