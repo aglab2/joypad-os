@@ -11,7 +11,7 @@ Joypad OS (formerly **USBRetro**) is firmware for RP2040 and ESP32-S3 based adap
 - USB X-input (Xbox controllers)
 - Bluetooth controllers (via USB BT dongle or Pico W)
 - WiFi controllers (via JOCP protocol on Pico W)
-- Native controllers (SNES, N64, GameCube via joybus)
+- Native controllers (SNES, N64, GameCube via joybus, LodgeNet via PIO)
 
 **Outputs:**
 - Retro consoles: PCEngine, GameCube, Dreamcast, Nuon, 3DO, Loopy
@@ -43,6 +43,8 @@ make usb2usb_feather   # USB/BT → USB HID
 make snes2usb_kb2040   # SNES → USB HID
 make n642usb_kb2040    # N64 → USB HID
 make gc2usb_kb2040     # GameCube → USB HID
+make lodgenet2usb_pico # LodgeNet → USB HID (Pico)
+make lodgenet2usb_pico2 # LodgeNet → USB HID (Pico 2)
 make n642dc_kb2040     # N64 → Dreamcast
 make bt2usb_pico_w     # BT-only → USB HID (Pico W)
 make bt2usb_xiao_esp32s3    # BLE-only → USB HID (ESP32-S3, requires ESP-IDF)
@@ -79,6 +81,7 @@ Output: `releases/joypad_<commit>_<app>_<board>.uf2`
 | `snes2usb` | KB2040 | SNES | USB HID |
 | `n642usb` | KB2040 | N64 | USB HID |
 | `gc2usb` | KB2040 | GameCube | USB HID |
+| `lodgenet2usb` | Pico/Pico 2 | LodgeNet (N64/GC/SNES) | USB HID |
 | `n642dc` | KB2040 | N64 | Dreamcast |
 | `snes23do` | RP2040-Zero | SNES | 3DO |
 | `usb2uart` | KB2040 | USB | UART/ESP32 |
@@ -120,6 +123,7 @@ src/
 │   ├── usb2uart/               # USB → UART bridge
 │   ├── snes2usb/               # SNES → USB HID
 │   ├── snes23do/               # SNES → 3DO
+│   ├── lodgenet2usb/           # LodgeNet → USB HID
 │   └── controller/             # Custom GPIO controllers
 ├── usb/
 │   ├── usbh/                   # USB Host (input)
@@ -156,7 +160,8 @@ src/
     └── host/                   # Native inputs (we read controllers)
         ├── snes/               # SNES controller reading
         ├── n64/                # N64 controller reading (joybus)
-        └── gc/                 # GameCube controller reading (joybus)
+        ├── gc/                 # GameCube controller reading (joybus)
+        └── lodgenet/           # LodgeNet hotel controllers (PIO, N64/GC/SNES)
 esp/                                # ESP-IDF build directory (ESP32-S3)
 ├── CMakeLists.txt                  # ESP-IDF project file
 ├── Makefile                        # Build/flash/monitor shortcuts
@@ -199,7 +204,8 @@ Bluetooth ────┼──→ router_submit_input() ──→ router ──
 WiFi (JOCP) ──┤                              │               ├──→ Nuon, 3DO
 Native SNES ──┤                              │               ├──→ USB Device
 Native N64 ───┤                              │               └──→ UART
-Native GC ────┘
+Native GC ────┤
+LodgeNet ─────┘
                                     profile_apply()
                                     (button remapping)
 ```
@@ -281,6 +287,7 @@ Console protocols use RP2040 PIO for precise timing:
 - **3DO**: `sampling.pio`, `output.pio`
 - **Loopy**: `loopy.pio`
 - **N64/GC Host**: `joybus.pio` (shared with GC device)
+- **LodgeNet Host**: `lodgenet.pio` (MCU + SR programs, swapped at runtime)
 
 ## Development Workflow
 
@@ -336,6 +343,16 @@ Console protocols use RP2040 PIO for precise timing:
    - Use `router_submit_input()` with dev_addr 0xD0+ range
 
 5. Remember to invert Y-axis if protocol uses non-HID convention
+
+### LodgeNet Host (reference implementation)
+
+The LodgeNet host (`src/native/host/lodgenet/`) is a good reference for PIO-based native input with:
+- **Multi-protocol auto-detection**: MCU (N64/GC) and SR (SNES) protocols on a single PIO SM, with programs swapped at runtime via `pio_remove_program`/`pio_add_program`
+- **Device type detection**: N64 vs GC distinguished by protocol flags (byte[1] bit 6)
+- **Controller layout reporting**: Sets `event.layout` to `LAYOUT_NINTENDO_N64`, `LAYOUT_GAMECUBE`, or `LAYOUT_NINTENDO_4FACE` for SInput face style
+- **VCC pin**: Drives a GPIO high to power the controller (RJ11 connector)
+- **Poll throttling**: MCU at ~60Hz, SR at ~131Hz (matching reference hardware framework)
+- **Encoded virtual buttons**: Impossible d-pad combos (SOCD) decoded as LodgeNet system buttons (Menu, Select, etc.)
 
 ## ESP32-S3 Development
 
