@@ -1696,6 +1696,7 @@ target_compile_definitions(joypad_lodgenet2n64 PRIVATE
     CONFIG_NO_NEOPIXEL=1
     BOARD_LED_PIN=25
     N64_DATA_PIN=7
+    NO_CUSTOM_UART_PINS=1
 )
 target_sources(joypad_lodgenet2n64 PUBLIC ${CORE_SOURCES}
     ${LODGENET_HOST_SOURCES}
@@ -1716,6 +1717,39 @@ pico_enable_stdio_usb(joypad_lodgenet2n64 1)
 pico_enable_stdio_uart(joypad_lodgenet2n64 1)
 pico_generate_pio_header(joypad_lodgenet2n64 ${CMAKE_CURRENT_LIST_DIR}/native/host/lodgenet/lodgenet.pio)
 pico_generate_pio_header(joypad_lodgenet2n64 ${CMAKE_CURRENT_LIST_DIR}/lib/joybus-pio/src/joybus.pio)
+
+
+# --- LODGENET2GC (LodgeNet -> GameCube Console) ---
+add_executable(joypad_lodgenet2gc)
+target_compile_definitions(joypad_lodgenet2gc PRIVATE
+    CONFIG_LODGENET2GC=1
+    CONFIG_USB=1
+    DISABLE_USB_HOST=1
+    CONFIG_NO_NEOPIXEL=1
+    BOARD_LED_PIN=25
+    GC_DATA_PIN=7
+    NO_CUSTOM_UART_PINS=1
+)
+target_sources(joypad_lodgenet2gc PUBLIC ${CORE_SOURCES} ${USB_DEVICE_SOURCES}
+    ${LODGENET_HOST_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/native/device/gamecube/gamecube_device.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/joybus-pio/src/joybus.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/joybus-pio/src/GamecubeConsole.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/apps/lodgenet2gc/app.c
+)
+target_include_directories(joypad_lodgenet2gc PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/apps/lodgenet2gc
+    ${CMAKE_CURRENT_SOURCE_DIR}/native/host/lodgenet
+    ${CMAKE_CURRENT_SOURCE_DIR}/native/device/gamecube
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/joybus-pio/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/usb/usbd
+)
+target_link_libraries(joypad_lodgenet2gc PRIVATE pico_stdlib pico_multicore hardware_pio hardware_flash pico_rand tinyusb_device tinyusb_board)
+joypad_target_common(joypad_lodgenet2gc)
+pico_enable_stdio_usb(joypad_lodgenet2gc 1)
+pico_enable_stdio_uart(joypad_lodgenet2gc 1)
+pico_generate_pio_header(joypad_lodgenet2gc ${CMAKE_CURRENT_LIST_DIR}/native/host/lodgenet/lodgenet.pio)
+pico_generate_pio_header(joypad_lodgenet2gc ${CMAKE_CURRENT_LIST_DIR}/lib/joybus-pio/src/joybus.pio)
 
 
 # ============================================================================

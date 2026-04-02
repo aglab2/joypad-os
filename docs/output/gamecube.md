@@ -119,4 +119,5 @@ See the [usb2gc app](../apps/usb2gc.md) for specific profile definitions (Defaul
 |-----|-------------|
 | `usb2gc` | USB/BT controllers to GameCube |
 | `bt2gc` | Bluetooth controllers to GameCube (Pico W) |
+| `lodgenet2gc` | LodgeNet hotel controllers to GameCube (Pico) |
 | `n642gc` | N64 controllers to GameCube (planned) |

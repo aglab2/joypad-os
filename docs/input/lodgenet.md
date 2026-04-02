@@ -210,3 +210,4 @@ No rumble or LED feedback -- LodgeNet controllers are passive devices.
 
 - [lodgenet2usb](../apps/lodgenet2usb.md) -- LodgeNet controllers to USB HID
 - [lodgenet2n64](../apps/lodgenet2n64.md) -- LodgeNet controllers to N64 console
+- [lodgenet2gc](../apps/lodgenet2gc.md) -- LodgeNet controllers to GameCube console

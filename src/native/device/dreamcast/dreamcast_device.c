@@ -1015,9 +1015,11 @@ static void SetupMapleRX(void)
 
 void dreamcast_init(void)
 {
-    // Configure custom UART pins (12=TX, 13=RX) for debug output
+    #ifdef UART_TX_PIN
+    // Configure custom UART pins (KB2040: 12=TX, 13=RX) for debug output
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+    #endif
     stdio_init_all();
 
     printf("[DC] Initializing Dreamcast Maple Bus output...\n");

@@ -74,9 +74,7 @@ static struct {
     .button_mode = BUTTON_MODE_3  // Default to gamepad mode
 };
 
-extern void GamecubeConsole_init(GamecubeConsole* console, uint pin, PIO pio, int sm, int offset);
-extern bool GamecubeConsole_WaitForPoll(GamecubeConsole* console);
-extern void GamecubeConsole_SendReport(GamecubeConsole* console, gc_report_t *report);
+// SetMode not yet in GamecubeConsole.h — declare locally
 extern void GamecubeConsole_SetMode(GamecubeConsole* console, GamecubeMode mode);
 
 uint8_t hid_to_gc_key[256] = {[0 ... 255] = GC_KEY_NOT_FOUND};
@@ -190,9 +188,11 @@ void ngc_init()
   // over clock CPU for correct timing with GC
   set_sys_clock_khz(130000, true);
 
-  // Configure custom UART pins (12=TX, 13=RX)
+  #ifdef UART_TX_PIN
+  // Configure custom UART pins (KB2040: 12=TX, 13=RX)
   gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
   gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+  #endif
 
   // corrects UART serial output after overclock
   stdio_init_all();
@@ -266,7 +266,7 @@ void __not_in_flash_func(core1_task)(void)
     gc_rumble = GamecubeConsole_WaitForPoll(&gc) ? 255 : 0;
 
     // Send GameCube controller button report
-    GamecubeConsole_SendReport(&gc, &gc_report);
+    GamecubeConsole_SendReport(&gc, &gc_report, 0, 0);
 
     gc_kb_counter++;
     gc_kb_counter &= 15;
