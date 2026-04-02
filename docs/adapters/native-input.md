@@ -158,17 +158,42 @@ Convert Nintendo LodgeNet hotel gaming controllers into USB HID gamepads. Suppor
 
 - **Board**: Pico or Pico 2
 - **Protocol**: PIO-based (MCU protocol for N64/GC at ~60Hz, SR protocol for SNES at ~131Hz)
-- **Connector**: RJ11 4-pin (Pin 1: +5V, Pin 2: CLK, Pin 3: DATA, Pin 4: GND)
+- **Connector**: RJ11 6P6C (6-pin, but only 4 used for game port)
 - **Build**: `make lodgenet2usb_pico` or `make lodgenet2usb_pico2`
 
-### Pinout
+### LodgeNet Connector
+
+The LodgeNet system uses a 6-pin RJ11-style connector. The GAME port connector is what the controller plugs into:
+
+```
+ ╔═╤═╤═╤═╤═╤═╤═╗       GAME        TV                MTI
+ ║ │ │ │ │ │ │ ║   1   DATA(in)    CLK(out)          IR(in)
+ ║ 1 2 3 4 5 6 ║   2   CLK(out)    MTI(in)           GND
+ ║             ║   3   12V         N/C               DATA(in)
+ ║             ║   4   CLK2(out)   DATA(out)         N/C
+ ╚════╤═══╤════╝   5   GND         GND               MTI(out)
+      └───┘        6   IR          IR(out)           CLK(in)
+```
+
+For the adapter, only 4 lines from the GAME port are needed:
+
+| RJ11 Pin | Signal | Description |
+|---|---|---|
+| 1 | DATA | Controller data output (active-low, pull-up) |
+| 2 | CLK | Host clock output (idle HIGH) |
+| 3 | 12V | Power input (use 5V from Pico VBUS instead) |
+| 5 | GND | Ground |
+
+Pin 4 (CLK2) is only used by SNES LodgeNet controllers. Pin 6 (IR) is for the TV remote interface and unused by the adapter.
+
+### GPIO Pinout (Pico / Pico 2)
 
 | GPIO | Function |
 |---|---|
-| 2 | DATA (input, pull-up) |
-| 3 | CLK1 (output, idle HIGH) |
-| 4 | VCC (output, always HIGH) |
-| 5 | CLK2 (output, SNES SR protocol only) |
+| 2 | DATA (input, pull-up) ← RJ11 pin 1 |
+| 3 | CLK1 (output, idle HIGH) ← RJ11 pin 2 |
+| 4 | VCC (output, always HIGH) — powers controller |
+| 5 | CLK2 (output, SNES SR protocol only) ← RJ11 pin 4 |
 
 ### Button Mapping — N64 LodgeNet
 
