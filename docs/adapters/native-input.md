@@ -163,7 +163,7 @@ Convert Nintendo LodgeNet hotel gaming controllers into USB HID gamepads. Suppor
 
 ### LodgeNet Connector
 
-The LodgeNet system uses a 6-pin RJ11-style connector. The GAME port connector is what the controller plugs into:
+The LodgeNet system uses a 6-pin RJ11-style connector. The GAME port connector is what the controller plugs into (diagram via [Nielk1](https://x.com/Nielk1)):
 
 ```
  ╔═╤═╤═╤═╤═╤═╤═╗       GAME        TV                MTI
