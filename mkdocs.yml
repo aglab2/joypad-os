@@ -116,8 +116,10 @@ nav:
       - SNES2USB (KB2040): hardware/builds/snes2usb-kb2040.md
       - N642DC (KB2040): hardware/builds/n642dc-kb2040.md
   - Platforms:
-    - ESP32-S3: platforms/esp32.md
-    - nRF52840: platforms/nrf52840.md
+    - Overview: platforms/index.md
+    - Pico SDK (RP2040/RP2350): platforms/pico-sdk.md
+    - ESP-IDF (ESP32-S3): platforms/esp32.md
+    - nRF Connect SDK (nRF52840): platforms/nrf52840.md
   - Protocol Reference:
     - 3DO PBus: protocols/3DO_PBUS.md
     - GameCube Joybus: protocols/GAMECUBE_JOYBUS.md
