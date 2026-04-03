@@ -154,33 +154,33 @@ static uint32_t apply_usbd_profile(const input_event_t* event, profile_output_t*
             // Apply stick sensitivity
             if (custom->left_stick_sens != 100) {
                 float sens = custom->left_stick_sens / 100.0f;
-                int16_t rel_x = (int16_t)profile_out->left_x - 128;
-                int16_t rel_y = (int16_t)profile_out->left_y - 128;
-                profile_out->left_x = (uint8_t)(128 + (int16_t)(rel_x * sens));
-                profile_out->left_y = (uint8_t)(128 + (int16_t)(rel_y * sens));
+                float rel_x = profile_out->left_x - 128.f;
+                float rel_y = profile_out->left_y - 128.f;
+                profile_out->left_x = (128.f + (rel_x * sens));
+                profile_out->left_y = (128.f + (rel_y * sens));
             }
             if (custom->right_stick_sens != 100) {
                 float sens = custom->right_stick_sens / 100.0f;
-                int16_t rel_x = (int16_t)profile_out->right_x - 128;
-                int16_t rel_y = (int16_t)profile_out->right_y - 128;
-                profile_out->right_x = (uint8_t)(128 + (int16_t)(rel_x * sens));
-                profile_out->right_y = (uint8_t)(128 + (int16_t)(rel_y * sens));
+                float rel_x = profile_out->right_x - 128.f;
+                float rel_y = profile_out->right_y - 128.f;
+                profile_out->right_x = (128.f + (rel_x * sens));
+                profile_out->right_y = (128.f + (rel_y * sens));
             }
 
             // Apply profile flags
             if (custom->flags & PROFILE_FLAG_SWAP_STICKS) {
-                uint8_t tmp_x = profile_out->left_x;
-                uint8_t tmp_y = profile_out->left_y;
+                float tmp_x = profile_out->left_x;
+                float tmp_y = profile_out->left_y;
                 profile_out->left_x = profile_out->right_x;
                 profile_out->left_y = profile_out->right_y;
                 profile_out->right_x = tmp_x;
                 profile_out->right_y = tmp_y;
             }
             if (custom->flags & PROFILE_FLAG_INVERT_LY) {
-                profile_out->left_y = 255 - profile_out->left_y;
+                profile_out->left_y = 255.f - profile_out->left_y;
             }
             if (custom->flags & PROFILE_FLAG_INVERT_RY) {
-                profile_out->right_y = 255 - profile_out->right_y;
+                profile_out->right_y = 255.f - profile_out->right_y;
             }
         }
     }

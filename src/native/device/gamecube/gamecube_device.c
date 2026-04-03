@@ -17,6 +17,8 @@
 #include "core/services/codes/codes.h"
 #include "core/router/router.h"
 
+#include <math.h>
+
 // Declaration of global variables
 GamecubeConsole gc;
 gc_report_t gc_report;
@@ -306,10 +308,25 @@ static void map_usbr_to_gc_report(const profile_output_t* output, gc_report_t* r
 
     // Analog sticks (invert Y: HID uses 0=up, GameCube uses 0=down)
     // Clamp to 1-255 range - some games reject 0 as invalid
-    report->stick_x = output->left_x < 1 ? 1 : output->left_x;
-    report->stick_y = (255 - output->left_y) < 1 ? 1 : (255 - output->left_y);
-    report->cstick_x = output->right_x < 1 ? 1 : output->right_x;
-    report->cstick_y = (255 - output->right_y) < 1 ? 1 : (255 - output->right_y);
+    int left_x  = roundf(output->left_x );
+    int left_y  = roundf(output->left_y );
+    int right_x = roundf(output->right_x);
+    int right_y = roundf(output->right_y);
+
+    if (left_x  > 255) left_x  = 255;
+    if (left_y  > 255) left_y  = 255;
+    if (right_x > 255) right_x = 255;
+    if (right_x > 255) right_x = 255;
+
+    if (left_x  < 1) left_x  = 1;
+    if (left_y  < 1) left_y  = 1;
+    if (right_x < 1) right_x = 1;
+    if (right_x < 1) right_x = 1;
+
+    report->stick_x = left_x;
+    report->stick_y = 256 - left_y;
+    report->cstick_x = right_x;
+    report->cstick_y = 256 - right_y;
 
     // Trigger analog values
     report->l_analog = output->l2_analog;

@@ -814,12 +814,12 @@ void __not_in_flash_func(update_3do_report)(uint8_t player_index) {
   if (event->type == INPUT_TYPE_NONE) return;
 
   uint32_t buttons = event->buttons;
-  uint8_t ax = event->analog[ANALOG_LX];   // Left stick X
-  uint8_t ay = event->analog[ANALOG_LY];   // Left stick Y
-  uint8_t az = event->analog[ANALOG_RX];   // Right stick X
-  uint8_t at = event->analog[ANALOG_RY];  // Right stick Y
-  uint8_t l2 = event->analog[ANALOG_L2];    // L2 trigger (stored in RZ)
-  uint8_t r2 = event->analog[ANALOG_R2]; // R2 trigger (stored in SLIDER)
+  float ax = event->analog[ANALOG_LX];   // Left stick X
+  float ay = event->analog[ANALOG_LY];   // Left stick Y
+  float az = event->analog[ANALOG_RX];   // Right stick X
+  float at = event->analog[ANALOG_RY];  // Right stick Y
+  float l2 = event->analog[ANALOG_L2];    // L2 trigger (stored in RZ)
+  float r2 = event->analog[ANALOG_R2]; // R2 trigger (stored in SLIDER)
 
   // Apply profile remapping
   const profile_t* profile = profile_get_active(OUTPUT_TARGET_3DO);

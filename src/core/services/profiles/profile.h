@@ -156,12 +156,13 @@ typedef struct {
     uint32_t buttons;           // Remapped button state (active-high: 1 = pressed)
 
     // Analog outputs (can be modified by button mappings)
-    uint8_t left_x;
-    uint8_t left_y;
-    uint8_t right_x;
-    uint8_t right_y;
-    uint8_t l2_analog;
-    uint8_t r2_analog;
+    // goes from 0 to 255
+    float left_x;
+    float left_y;
+    float right_x;
+    float right_y;
+    float l2_analog;
+    float r2_analog;
 
     // Flags for analog overrides (buttons forced analog values)
     bool left_x_override;
@@ -315,9 +316,9 @@ void profile_save_to_flash(output_target_t output);
 // This is the main function output devices call
 void profile_apply(const profile_t* profile,
                    uint32_t input_buttons,
-                   uint8_t lx, uint8_t ly,
-                   uint8_t rx, uint8_t ry,
-                   uint8_t l2, uint8_t r2,
+                   float lx, float ly,
+                   float rx, float ry,
+                   float l2, float r2,
                    profile_output_t* output);
 
 // Simple button-only mapping (for basic use cases)

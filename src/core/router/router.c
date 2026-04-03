@@ -37,15 +37,15 @@ extern int hid_get_ctrl_type(uint8_t dev_addr, uint8_t instance);
 // Threshold for analog stick movement to trigger player auto-assign
 // Value is distance from center (128). Range 0-127.
 // 50 means stick must move to < 78 or > 178 to trigger (about 40% deflection)
-#define ANALOG_ASSIGN_THRESHOLD 50
+#define ANALOG_ASSIGN_THRESHOLD 50.f
 
 // Check if any analog stick is moved beyond threshold
 // Returns true if left or right stick is deflected significantly
 static inline bool analog_beyond_threshold(const input_event_t* event) {
     // Check left stick X/Y and right stick X/Y (first 4 analog axes)
     for (int i = 0; i < 4; i++) {
-        int deflection = (int)event->analog[i] - 128;
-        if (deflection < 0) deflection = -deflection;  // abs()
+        float deflection = event->analog[i] - 128.f;
+        if (deflection < 0.f) deflection = -deflection;  // abs()
         if (deflection > ANALOG_ASSIGN_THRESHOLD) {
             return true;
         }
@@ -586,8 +586,8 @@ static inline void router_merge_mode(const input_event_t* event, output_target_t
                             }
                         } else {
                             // Sticks (LX, LY, RX, RY): use furthest from center
-                            int8_t cur_delta = (int8_t)(out->current_state.analog[j] - 128);
-                            int8_t dev_delta = (int8_t)(dev->analog[j] - 128);
+                            float cur_delta = (out->current_state.analog[j] - 128.f);
+                            float dev_delta = (dev->analog[j] - 128.f);
                             if (abs(dev_delta) > abs(cur_delta)) {
                                 out->current_state.analog[j] = dev->analog[j];
                             }
@@ -910,8 +910,8 @@ void router_device_disconnected(uint8_t dev_addr, int8_t instance) {
                         }
                     } else {
                         // Sticks: use furthest from center
-                        int8_t cur_delta = (int8_t)(out_state->current_state.analog[j] - 128);
-                        int8_t dev_delta = (int8_t)(dev->analog[j] - 128);
+                        float cur_delta = out_state->current_state.analog[j] - 128.f;
+                        float dev_delta = dev->analog[j] - 128.f;
                         if (abs(dev_delta) > abs(cur_delta)) {
                             out_state->current_state.analog[j] = dev->analog[j];
                         }

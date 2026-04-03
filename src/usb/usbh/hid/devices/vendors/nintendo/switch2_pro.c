@@ -130,18 +130,18 @@ static bool is_switch2_pro(uint16_t vid, uint16_t pid) {
 // center: calibrated center value
 // range: effective stick range from center to max deflection
 // Returns: 0-255 with 128 as center
-static uint8_t scale_analog_calibrated(uint16_t val, uint16_t center, uint16_t range) {
+static float scale_analog_calibrated(uint16_t val, uint16_t center, uint16_t range) {
   int32_t centered = (int32_t)val - (int32_t)center;
 
   // Scale to -128..+127 range using effective stick range
-  int32_t scaled = (centered * 127) / range;
+  int32_t scaled = (centered * 127.f) / range;
 
   // Clamp to valid range
-  if (scaled < -128) scaled = -128;
-  if (scaled > 127) scaled = 127;
+  if (scaled < -128.f) scaled = -128.f;
+  if (scaled > 127.f) scaled = 127.f;
 
   // Convert to 0-255 with 128 as center
-  return (uint8_t)(scaled + 128);
+  return scaled + 128.f;
 }
 
 // Encode haptic data for one motor (5 bytes)
@@ -369,10 +369,10 @@ void input_switch2_pro(uint8_t dev_addr, uint8_t instance, uint8_t const* report
   uint16_t right_range = is_gc ? STICK_RANGE_GC_CSTICK : STICK_RANGE_PRO;
 
   // Invert Y: Nintendo uses up=high, HID uses up=low
-  uint8_t lx = scale_analog_calibrated(left_x, inst->cal_lx.center, left_range);
-  uint8_t ly = 255 - scale_analog_calibrated(left_y, inst->cal_ly.center, left_range);
-  uint8_t rx = scale_analog_calibrated(right_x, inst->cal_rx.center, right_range);
-  uint8_t ry = 255 - scale_analog_calibrated(right_y, inst->cal_ry.center, right_range);
+  float lx = scale_analog_calibrated(left_x, inst->cal_lx.center, left_range);
+  float ly = 255 - scale_analog_calibrated(left_y, inst->cal_ly.center, left_range);
+  float rx = scale_analog_calibrated(right_x, inst->cal_rx.center, right_range);
+  float ry = 255 - scale_analog_calibrated(right_y, inst->cal_ry.center, right_range);
 
   // Parse analog triggers (GameCube only, at offset 13-14 right after sticks)
   uint8_t lt = 0;
@@ -400,12 +400,12 @@ void input_switch2_pro(uint8_t dev_addr, uint8_t instance, uint8_t const* report
 
     // Scale to 0-255
     if (raw_lt <= lt_min) lt = 0;
-    else if (raw_lt >= lt_max) lt = 255;
-    else lt = (uint8_t)(((uint16_t)(raw_lt - lt_min) * 255) / (lt_max - lt_min));
+    else if (raw_lt >= lt_max) lt = 255.f;
+    else lt = (((uint16_t)(raw_lt - lt_min) * 255.f) / (lt_max - lt_min));
 
     if (raw_rt <= rt_min) rt = 0;
-    else if (raw_rt >= rt_max) rt = 255;
-    else rt = (uint8_t)(((uint16_t)(raw_rt - rt_min) * 255) / (rt_max - rt_min));
+    else if (raw_rt >= rt_max) rt = 255.f;
+    else rt = (((uint16_t)(raw_rt - rt_min) * 255.f) / (rt_max - rt_min));
   }
 
   uint32_t buttons = 0;

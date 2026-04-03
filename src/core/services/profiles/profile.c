@@ -675,9 +675,9 @@ static void apply_analog_target(analog_target_t target, uint8_t value, profile_o
 
 void profile_apply(const profile_t* profile,
                    uint32_t input_buttons,
-                   uint8_t lx, uint8_t ly,
-                   uint8_t rx, uint8_t ry,
-                   uint8_t l2, uint8_t r2,
+                   float lx, float ly,
+                   float rx, float ry,
+                   float l2, float r2,
                    profile_output_t* output)
 {
     // Suppress combo buttons when profile switch is active
@@ -804,31 +804,38 @@ void profile_apply(const profile_t* profile,
     // Apply left stick sensitivity scaling
     if (left_sens != 1.0f) {
         if (!output->left_x_override) {
-            int16_t rel_x = (int16_t)output->left_x - 128;
-            output->left_x = (uint8_t)(128 + (int16_t)(rel_x * left_sens));
+            float rel_x = output->left_x - 128.f;
+            output->left_x = 128.f + (rel_x * left_sens);
         }
         if (!output->left_y_override) {
-            int16_t rel_y = (int16_t)output->left_y - 128;
-            output->left_y = (uint8_t)(128 + (int16_t)(rel_y * left_sens));
+            float rel_y = output->left_y - 128.f;
+            output->left_y = 128.f + (rel_y * left_sens);
         }
     }
 
     {
-        float arr[] = { (int16_t)output->left_x - 128, (int16_t)output->left_y - 128 };
+        float arr[] = { output->left_x - 128.f, output->left_y - 128.f };
         float phi = atan2f(arr[1], arr[0]);
 
         const float anglePart = 2 * 3.14159265f / 8;
-        const float deadzoneAnglePart = anglePart * 0.04f;
-        float roundedPhi = roundf(phi / anglePart) * anglePart;
+        const int part = roundf(phi / anglePart);
+        const float size = (part == 2 || part == -2) ? 0.02f : 0.04f;
+        const float deadzoneAnglePart = anglePart * size;
+        float roundedPhi = part * anglePart;
         float distPhi = fabsf(roundedPhi - phi);
 
         if (distPhi < deadzoneAnglePart)
         {
             float r = sqrtf(arr[0] * arr[0] + arr[1] * arr[1]);
+            if (r > 127.f)
+            {
+                r = 127.f;
+            }
+
             arr[0] = r * cosf(roundedPhi);
             arr[1] = r * sinf(roundedPhi);
-            output->left_x = (uint8_t)(128 + (int16_t)(arr[0]));
-            output->left_y = (uint8_t)(128 + (int16_t)(arr[1]));
+            output->left_x = 128.f + arr[0];
+            output->left_y = 128.f + arr[1];
         }
     }
 

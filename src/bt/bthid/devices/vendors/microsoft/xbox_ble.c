@@ -134,13 +134,13 @@ static void xbox_ble_process_report(bthid_device_t* device, const uint8_t* data,
     uint16_t btn = (uint16_t)(report[13] | (report[14] << 8));
 
     // Scale sticks from uint16 (0-65535) to uint8 (0-255)
-    uint8_t lx = raw_lx >> 8;
-    uint8_t ly = raw_ly >> 8;
-    uint8_t rx = raw_rx >> 8;
-    uint8_t ry = raw_ry >> 8;
+    float lx = raw_lx / 256.f;
+    float ly = raw_ly / 256.f;
+    float rx = raw_rx / 256.f;
+    float ry = raw_ry / 256.f;
     // Triggers are 10-bit (0-1023), scale to 8-bit
-    uint8_t lt = raw_lt >> 2;
-    uint8_t rt = raw_rt >> 2;
+    float lt = raw_lt / 4.f;
+    float rt = raw_rt / 4.f;
 
     uint32_t buttons = 0;
 
@@ -157,8 +157,8 @@ static void xbox_ble_process_report(bthid_device_t* device, const uint8_t* data,
     if (btn & XBOX_BLE_Y)              buttons |= JP_BUTTON_B4;
     if (btn & XBOX_BLE_LEFT_SHOULDER)  buttons |= JP_BUTTON_L1;
     if (btn & XBOX_BLE_RIGHT_SHOULDER) buttons |= JP_BUTTON_R1;
-    if (lt > 10)                       buttons |= JP_BUTTON_L2;
-    if (rt > 10)                       buttons |= JP_BUTTON_R2;
+    if (lt > 10.f)                     buttons |= JP_BUTTON_L2;
+    if (rt > 10.f)                     buttons |= JP_BUTTON_R2;
     if (btn & XBOX_BLE_BACK)           buttons |= JP_BUTTON_S1;
     if (btn & XBOX_BLE_START)          buttons |= JP_BUTTON_S2;
     if (btn & XBOX_BLE_LEFT_THUMB)     buttons |= JP_BUTTON_L3;

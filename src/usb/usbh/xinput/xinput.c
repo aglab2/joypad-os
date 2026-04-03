@@ -30,7 +30,7 @@ int last_player_count = 0; // used by xboxone
 // Size +1 because device addresses are 1-indexed (1 to CFG_TUH_DEVICE_MAX inclusive)
 static uint32_t chatpad_last_keepalive[CFG_TUH_DEVICE_MAX + 1][CFG_TUH_XINPUT];
 
-uint8_t byteScaleAnalog(int16_t xbox_val);
+static float byteScaleAnalog(int16_t xbox_val);
 
 //--------------------------------------------------------------------+
 // Custom USB Host Drivers
@@ -101,10 +101,10 @@ void tuh_xinput_report_received_cb(uint8_t dev_addr, uint8_t instance, xinputh_i
       // Scale Xbox analog values to [1-255] range (platform-agnostic)
       // XInput uses positive Y = UP, but internal format uses Y: 0=UP, 255=DOWN
       // So we invert Y-axis values to match HID convention
-      uint8_t analog_1x = byteScaleAnalog(p->sThumbLX);
-      uint8_t analog_1y = 256 - byteScaleAnalog(p->sThumbLY);  // Invert Y
-      uint8_t analog_2x = byteScaleAnalog(p->sThumbRX);
-      uint8_t analog_2y = 256 - byteScaleAnalog(p->sThumbRY);  // Invert Y
+      float analog_1x = byteScaleAnalog(p->sThumbLX);
+      float analog_1y = 256.f - byteScaleAnalog(p->sThumbLY);  // Invert Y
+      float analog_2x = byteScaleAnalog(p->sThumbRX);
+      float analog_2y = 256.f - byteScaleAnalog(p->sThumbRY);  // Invert Y
       uint8_t analog_l = p->bLeftTrigger;
       uint8_t analog_r = p->bRightTrigger;
 
@@ -190,11 +190,11 @@ void tuh_xinput_umount_cb(uint8_t dev_addr, uint8_t instance)
   xbone_auth_unregister(dev_addr);
 }
 
-uint8_t byteScaleAnalog(int16_t xbox_val)
+static float byteScaleAnalog(int16_t xbox_val)
 {
   // Scale the xbox value from [-32768, 32767] to [1, 255]
   // Offset by 32768 to get in range [0, 65536], then divide by 256 to get in range [1, 255]
-  uint8_t scale_val = (xbox_val + 32768) / 256;
+  float scale_val = (xbox_val + 32768) / 256.f;
   if (scale_val == 0) return 1;
   return scale_val;
 }

@@ -112,7 +112,7 @@ static wii_u_pro_data_t wii_u_data[BTHID_MAX_DEVICES];
 // ============================================================================
 
 // Scale 16-bit stick value (center ~2048) to 8-bit (center 128)
-static uint8_t scale_stick(uint16_t val)
+static float scale_stick(uint16_t val)
 {
     // Clamp to valid range
     if (val < WIIU_STICK_CENTER - WIIU_STICK_RANGE) {
@@ -124,10 +124,10 @@ static uint8_t scale_stick(uint16_t val)
 
     // Map from [center-range, center+range] to [0, 255]
     int32_t centered = (int32_t)val - WIIU_STICK_CENTER;
-    int32_t scaled = (centered * 127) / WIIU_STICK_RANGE + 128;
+    float scaled = (centered * 127.f) / WIIU_STICK_RANGE + 128;
 
-    if (scaled < 1) scaled = 1;
-    if (scaled > 255) scaled = 255;
+    if (scaled < 1.f) scaled = 1.f;
+    if (scaled > 255.f) scaled = 255.f;
 
     return (uint8_t)scaled;
 }
@@ -366,9 +366,9 @@ static void wii_u_process_report(bthid_device_t* device, const uint8_t* data, ui
         // Scale sticks to 8-bit
         // Y axes are inverted on Wii U Pro (up = higher value)
         wii->event.analog[ANALOG_LX] = scale_stick(lx);
-        wii->event.analog[ANALOG_LY] = 255 - scale_stick(ly);  // Invert Y
+        wii->event.analog[ANALOG_LY] = 255.f - scale_stick(ly);  // Invert Y
         wii->event.analog[ANALOG_RX] = scale_stick(rx);
-        wii->event.analog[ANALOG_RY] = 255 - scale_stick(ry); // Invert Y
+        wii->event.analog[ANALOG_RY] = 255.f - scale_stick(ry); // Invert Y
 
         router_submit_input(&wii->event);
 

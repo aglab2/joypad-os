@@ -90,18 +90,18 @@ static switch2_ble_data_t switch2_data[BTHID_MAX_DEVICES];
 // center: calibrated center value
 // range: effective stick range from center to max deflection
 // Returns: 0-255 with 128 as center
-static uint8_t scale_analog_calibrated(uint16_t val, uint16_t center, uint16_t range) {
+static float scale_analog_calibrated(uint16_t val, uint16_t center, uint16_t range) {
     int32_t centered = (int32_t)val - (int32_t)center;
 
     // Scale to -128..+127 range using effective stick range
-    int32_t scaled = (centered * 127) / range;
+    int32_t scaled = (centered * 127.f) / range;
 
     // Clamp to valid range
-    if (scaled < -128) scaled = -128;
-    if (scaled > 127) scaled = 127;
+    if (scaled < -128.f) scaled = -128.f;
+    if (scaled > 127.f) scaled = 127.f;
 
     // Convert to 0-255 with 128 as center
-    return (uint8_t)(scaled + 128);
+    return scaled + 128.f;
 }
 
 // ============================================================================

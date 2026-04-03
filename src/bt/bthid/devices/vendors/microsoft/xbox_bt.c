@@ -87,20 +87,20 @@ static xbox_bt_data_t xbox_data[BTHID_MAX_DEVICES];
 // ============================================================================
 
 // Scale 16-bit signed stick value to 8-bit unsigned (1-255, 128 center)
-static uint8_t scale_stick_16to8(int16_t val)
+static float scale_stick_16to8(int16_t val)
 {
     // Scale from [-32768, 32767] to [1, 255]
-    int32_t scaled = ((int32_t)val + 32768) / 256;
-    if (scaled <= 0) return 1;
-    if (scaled >= 255) return 255;
-    return (uint8_t)scaled;
+    float scaled = ((int32_t)val + 32768) / 256.f;
+    if (scaled <= 0) return 1.f;
+    if (scaled >= 255) return 255.f;
+    return scaled;
 }
 
 // Scale 10-bit trigger value to 8-bit (0-255)
-static uint8_t scale_trigger_10to8(uint16_t val)
+static float scale_trigger_10to8(uint16_t val)
 {
     // Scale from [0, 1023] to [0, 255]
-    return (uint8_t)(val >> 2);
+    return val / 4.f;
 }
 
 // ============================================================================
@@ -169,8 +169,8 @@ static void xbox_process_report(bthid_device_t* device, const uint8_t* data, uin
     if (!xbox || len < 2) return;
 
     uint32_t buttons = 0x00000000;
-    uint8_t lx = 128, ly = 128, rx = 128, ry = 128;
-    uint8_t lt = 0, rt = 0;
+    float lx = 128, ly = 128, rx = 128, ry = 128;
+    float lt = 0, rt = 0;
 
     // Xbox BT controllers can send different report formats
     // Try to detect based on report length and parse accordingly

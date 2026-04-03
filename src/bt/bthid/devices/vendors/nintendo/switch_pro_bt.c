@@ -146,10 +146,10 @@ static uint16_t unpack_stick_12bit(const uint8_t* data, bool high)
 }
 
 // Scale 12-bit to 8-bit
-static uint8_t scale_12bit_to_8bit(uint16_t val)
+static float scale_12bit_to_8bit(uint16_t val)
 {
-    if (val == 0) return 1;
-    return 1 + ((val * 254) / 4095);
+    if (val == 0) return 1.f;
+    return 1.f + ((val * 254.f) / 4095.f);
 }
 
 static void switch_send_subcommand(bthid_device_t* device, uint8_t subcmd,
@@ -346,9 +346,9 @@ static void switch_process_report(bthid_device_t* device, const uint8_t* data, u
 
         sw->event.buttons = buttons;
         sw->event.analog[ANALOG_LX] = rpt->lx;
-        sw->event.analog[ANALOG_LY] = 255 - rpt->ly;  // Invert Y (Nintendo: up=high, HID: up=low)
+        sw->event.analog[ANALOG_LY] = 255.f - rpt->ly;  // Invert Y (Nintendo: up=high, HID: up=low)
         sw->event.analog[ANALOG_RX] = rpt->rx;
-        sw->event.analog[ANALOG_RY] = 255 - rpt->ry; // Invert Y (Nintendo: up=high, HID: up=low)
+        sw->event.analog[ANALOG_RY] = 255.f - rpt->ry; // Invert Y (Nintendo: up=high, HID: up=low)
 
         router_submit_input(&sw->event);
 

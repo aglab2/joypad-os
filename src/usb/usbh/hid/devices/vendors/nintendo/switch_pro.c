@@ -111,24 +111,24 @@ bool diff_report_switch_pro(switch_pro_report_t const* rpt1, switch_pro_report_t
 #define CAL_SAMPLES_NEEDED 4
 
 // Legacy scaling for Joy-Cons (uncalibrated, simple linear)
-static uint8_t scale_analog_joycon(uint16_t switch_val) {
+static float scale_analog_joycon(uint16_t switch_val) {
   if (switch_val == 0) return 1;
-  return 1 + ((switch_val - 1) * 255) / 4095;
+  return 1 + ((switch_val - 1) * 255) / 4095.f;
 }
 
 // Scale calibrated analog value to 8-bit (0-255, 128 = center)
-static uint8_t scale_analog_calibrated(uint16_t val, uint16_t center) {
+static float scale_analog_calibrated(uint16_t val, uint16_t center) {
   int32_t centered = (int32_t)val - (int32_t)center;
 
   // Scale to -128..+127 range using effective stick range
-  int32_t scaled = (centered * 127) / STICK_RANGE;
+  float scaled = (centered * 127.f) / STICK_RANGE;
 
   // Clamp to valid range
-  if (scaled < -128) scaled = -128;
-  if (scaled > 127) scaled = 127;
+  if (scaled < -128.f) scaled = -128.f;
+  if (scaled > 127.f) scaled = 127.f;
 
   // Convert to 0-255 with 128 as center
-  return (uint8_t)(scaled + 128);
+  return scaled + 128.f;
 }
 
 // resets default values in case devices are hotswapped
@@ -268,17 +268,17 @@ void input_report_switch_pro(uint8_t dev_addr, uint8_t instance, uint8_t const* 
       bool bttn_a1 = update_report.home;
       bool bttn_a2 = update_report.cap;
 
-      uint8_t leftX = 0;
-      uint8_t leftY = 0;
-      uint8_t rightX = 0;
-      uint8_t rightY = 0;
+      float leftX = 0;
+      float leftY = 0;
+      float rightX = 0;
+      float rightY = 0;
 
       if (switch_devices[dev_addr].is_pro) {
         // Use calibrated scaling for Pro controllers
         leftX = scale_analog_calibrated(update_report.left_x, inst->cal_lx.center);
-        leftY = 255 - scale_analog_calibrated(update_report.left_y, inst->cal_ly.center);   // Invert Y
+        leftY = 255.f - scale_analog_calibrated(update_report.left_y, inst->cal_ly.center);   // Invert Y
         rightX = scale_analog_calibrated(update_report.right_x, inst->cal_rx.center);
-        rightY = 255 - scale_analog_calibrated(update_report.right_y, inst->cal_ry.center); // Invert Y
+        rightY = 255.f - scale_analog_calibrated(update_report.right_y, inst->cal_ry.center); // Invert Y
       } else {
         bool is_left_joycon = (!update_report.right_x && !update_report.right_y);
         bool is_right_joycon = (!update_report.left_x && !update_report.left_y);

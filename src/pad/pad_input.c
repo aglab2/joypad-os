@@ -158,7 +158,7 @@ static bool pad_read_button(int16_t pin, bool active_high) {
 #define ADC_STICK_MAX  3000  // Maximum ADC value at full deflection
 #define ADC_STICK_CENTER 2048
 
-static uint8_t pad_read_adc(int8_t channel, bool invert) {
+static float pad_read_adc(int8_t channel, bool invert) {
     if (channel < 0 || channel > 3) return 128;  // Centered
 
     adc_select_input(channel);
@@ -170,22 +170,22 @@ static uint8_t pad_read_adc(int8_t channel, bool invert) {
     if (raw > ADC_STICK_MAX) raw = ADC_STICK_MAX;
 
     // Scale to 0-255
-    uint32_t scaled = ((uint32_t)(raw - ADC_STICK_MIN) * 255) / (ADC_STICK_MAX - ADC_STICK_MIN);
-    uint8_t value = (uint8_t)scaled;
+    float scaled = ((float)(raw - ADC_STICK_MIN) * 255.f) / (ADC_STICK_MAX - ADC_STICK_MIN);
+    float value = scaled;
 
     if (invert) {
-        value = 255 - value;
+        value = 255.f - value;
     }
 
     return value;
 }
 
 // Apply deadzone to analog value (centered at 128)
-static uint8_t apply_deadzone(uint8_t value, uint8_t deadzone) {
-    int16_t centered = (int16_t)value - 128;
+static float apply_deadzone(float value, float deadzone) {
+    float centered = value - 128;
 
     if (centered > -deadzone && centered < deadzone) {
-        return 128;  // In deadzone, return center
+        return 128.f;  // In deadzone, return center
     }
 
     return value;

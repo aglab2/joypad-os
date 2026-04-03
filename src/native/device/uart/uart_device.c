@@ -32,7 +32,7 @@ static volatile uint8_t tx_queue_tail = 0;
 // Previous state for change detection
 #define UART_MAX_PLAYERS 8  // Maximum players tracked by UART device
 static uint32_t prev_buttons[UART_MAX_PLAYERS];
-static uint8_t prev_analog[UART_MAX_PLAYERS][6];
+static float prev_analog[UART_MAX_PLAYERS][6];
 
 // Receive state machine (for feedback packets)
 typedef enum {

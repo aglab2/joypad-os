@@ -107,13 +107,13 @@ typedef struct {
 
     // Absolute analog inputs (0-255, centered at 128 for sticks, 0 for triggers)
     // All values are normalized regardless of device type
-    uint8_t analog[ANALOG_COUNT]; // Standard analog axes (see analog_axis_index_t)
-                                  // [0] = LX (Left stick X)
-                                  // [1] = LY (Left stick Y)
-                                  // [2] = RX (Right stick X)
-                                  // [3] = RY (Right stick Y)
-                                  // [4] = L2 (Left trigger)
-                                  // [5] = R2 (Right trigger)
+    float analog[ANALOG_COUNT]; // Standard analog axes (see analog_axis_index_t)
+                                // [0] = LX (Left stick X)
+                                // [1] = LY (Left stick Y)
+                                // [2] = RX (Right stick X)
+                                // [3] = RY (Right stick Y)
+                                // [4] = L2 (Left trigger)
+                                // [5] = R2 (Right trigger)
 
     // Relative inputs (mouse, spinner, trackball)
     int8_t delta_x;             // Horizontal delta (-127 to +127)
