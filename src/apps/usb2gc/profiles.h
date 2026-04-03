@@ -27,16 +27,14 @@
 
 static const button_map_entry_t gc_default_map[] = {
     // Face buttons - SNES/PlayStation-style to GameCube
-    MAP_BUTTON(JP_BUTTON_B1, GC_BUTTON_B),      // Cross/B → GC B
-    MAP_BUTTON(JP_BUTTON_B2, GC_BUTTON_A),      // Circle/A → GC A
-    MAP_BUTTON(JP_BUTTON_B3, GC_BUTTON_Y),      // Square/X → GC Y
-    MAP_BUTTON(JP_BUTTON_B4, GC_BUTTON_X),      // Triangle/Y → GC X
+    MAP_BUTTON(JP_BUTTON_B1, GC_BUTTON_A),      // Cross/B → GC B
+    MAP_BUTTON(JP_BUTTON_B2, GC_BUTTON_B),      // Circle/A → GC A
+    MAP_BUTTON(JP_BUTTON_B3, GC_BUTTON_X),      // Square/X → GC Y
+    MAP_BUTTON(JP_BUTTON_B4, GC_BUTTON_Y),      // Triangle/Y → GC X
 
     // Shoulders
     MAP_BUTTON(JP_BUTTON_R1, GC_BUTTON_Z),      // R1/RB → Z
-
-    // L1/LB → nothing (GC has no equivalent)
-    MAP_DISABLED(JP_BUTTON_L1),
+    MAP_BUTTON(JP_BUTTON_L1, GC_BUTTON_L | GC_BUTTON_R),      // R1/RB → Z
 
     // System
     MAP_BUTTON(JP_BUTTON_S2, GC_BUTTON_START),  // Start → Start
@@ -245,10 +243,6 @@ static const profile_t gc_profile_fighting = {
 
 static const profile_t gc_profiles[] = {
     gc_profile_default,
-    gc_profile_snes,
-    gc_profile_ssbm,
-    gc_profile_mkwii,
-    gc_profile_fighting,
 };
 
 static const profile_set_t gc_profile_set = {

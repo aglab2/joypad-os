@@ -5,6 +5,7 @@
 
 #include "profile.h"
 #include "pico/stdlib.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -809,6 +810,25 @@ void profile_apply(const profile_t* profile,
         if (!output->left_y_override) {
             int16_t rel_y = (int16_t)output->left_y - 128;
             output->left_y = (uint8_t)(128 + (int16_t)(rel_y * left_sens));
+        }
+    }
+
+    {
+        float arr[] = { (int16_t)output->left_x - 128, (int16_t)output->left_y - 128 };
+        float phi = atan2f(arr[1], arr[0]);
+
+        const float anglePart = 2 * 3.14159265f / 8;
+        const float deadzoneAnglePart = anglePart * 0.04f;
+        float roundedPhi = roundf(phi / anglePart) * anglePart;
+        float distPhi = fabsf(roundedPhi - phi);
+
+        if (distPhi < deadzoneAnglePart)
+        {
+            float r = sqrtf(arr[0] * arr[0] + arr[1] * arr[1]);
+            arr[0] = r * cosf(roundedPhi);
+            arr[1] = r * sinf(roundedPhi);
+            output->left_x = (uint8_t)(128 + (int16_t)(arr[0]));
+            output->left_y = (uint8_t)(128 + (int16_t)(arr[1]));
         }
     }
 

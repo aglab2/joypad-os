@@ -191,7 +191,7 @@ define build_app
 	@echo "  Input:   $(word 4,$(APP_$1))"
 	@echo "  Output:  $(word 5,$(APP_$1))"
 	@echo "  Version: $(VERSION_ID)"
-	@cd src && rm -rf build
+	@cd src
 	@cd src && sh $(BOARD_SCRIPT_$(word 1,$(APP_$1)))
 	@cd src/build && $(MAKE) --no-print-directory $(CONSOLE_$(word 2,$(APP_$1))) -j4
 	@mkdir -p $(RELEASE_DIR)
