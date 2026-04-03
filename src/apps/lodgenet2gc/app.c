@@ -152,12 +152,43 @@ void app_init(void)
 // APP TASK (Called from main loop)
 // ============================================================================
 
+// Profile indices (must match order in profiles.h)
+#define PROFILE_GC   0
+#define PROFILE_N64  1
+#define PROFILE_SNES 2
+
 void app_task(void)
 {
     // Check for bootloader command on CDC serial ('B' = reboot to bootloader)
     int c = getchar_timeout_us(0);
     if (c == 'B') {
         reset_usb_boot(0, 0);
+    }
+
+    // Auto-switch profile based on detected LodgeNet controller type
+    static lodgenet_device_t last_type = LODGENET_DEVICE_NONE;
+    lodgenet_device_t type = lodgenet_host_get_device_type();
+    if (type != last_type && type != LODGENET_DEVICE_NONE) {
+        last_type = type;
+        switch (type) {
+            case LODGENET_DEVICE_GC:
+                profile_set_active(OUTPUT_TARGET_GAMECUBE, PROFILE_GC);
+                printf("[app:lodgenet2gc] Profile: GC\n");
+                break;
+            case LODGENET_DEVICE_N64:
+                profile_set_active(OUTPUT_TARGET_GAMECUBE, PROFILE_N64);
+                printf("[app:lodgenet2gc] Profile: N64\n");
+                break;
+            case LODGENET_DEVICE_SNES:
+                profile_set_active(OUTPUT_TARGET_GAMECUBE, PROFILE_SNES);
+                printf("[app:lodgenet2gc] Profile: SNES\n");
+                break;
+            default:
+                break;
+        }
+    }
+    if (type == LODGENET_DEVICE_NONE) {
+        last_type = LODGENET_DEVICE_NONE;
     }
 
     // Update LED status

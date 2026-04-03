@@ -170,6 +170,14 @@ void app_init(void)
 // APP TASK (Called from main loop)
 // ============================================================================
 
+// Profile indices (must match order in profiles.h)
+#define PROFILE_N64       0
+#define PROFILE_GC        1
+#define PROFILE_SNES_DPAD 2
+#define PROFILE_SNES_STICK 3
+
+static bool snes_stick_mode = false;
+
 void app_task(void)
 {
     // Check for bootloader command on CDC serial ('B' = reboot to bootloader)
@@ -178,8 +186,49 @@ void app_task(void)
         reset_usb_boot(0, 0);
     }
 
-    // Forward rumble from N64 console to feedback system
-    // (LodgeNet controllers don't have rumble, but keeps the path consistent)
+    // Auto-switch profile based on detected LodgeNet controller type
+    static lodgenet_device_t last_type = LODGENET_DEVICE_NONE;
+    lodgenet_device_t type = lodgenet_host_get_device_type();
+    if (type != last_type && type != LODGENET_DEVICE_NONE) {
+        last_type = type;
+        switch (type) {
+            case LODGENET_DEVICE_N64:
+                profile_set_active(OUTPUT_TARGET_N64, PROFILE_N64);
+                snes_stick_mode = false;
+                printf("[app:lodgenet2n64] Profile: N64\n");
+                break;
+            case LODGENET_DEVICE_GC:
+                profile_set_active(OUTPUT_TARGET_N64, PROFILE_GC);
+                snes_stick_mode = false;
+                printf("[app:lodgenet2n64] Profile: GC\n");
+                break;
+            case LODGENET_DEVICE_SNES:
+                snes_stick_mode = false;
+                profile_set_active(OUTPUT_TARGET_N64, PROFILE_SNES_DPAD);
+                printf("[app:lodgenet2n64] Profile: SNES (d-pad)\n");
+                break;
+            default:
+                break;
+        }
+    }
+    if (type == LODGENET_DEVICE_NONE) {
+        last_type = LODGENET_DEVICE_NONE;
+    }
+
+    // SNES Order button (A2) toggles between d-pad and stick mode
+    if (type == LODGENET_DEVICE_SNES) {
+        static bool order_was_pressed = false;
+        uint32_t raw_buttons = lodgenet_host_get_buttons();
+        bool order_pressed = (raw_buttons & JP_BUTTON_A2) != 0;
+        if (order_pressed && !order_was_pressed) {
+            snes_stick_mode = !snes_stick_mode;
+            profile_set_active(OUTPUT_TARGET_N64,
+                snes_stick_mode ? PROFILE_SNES_STICK : PROFILE_SNES_DPAD);
+            printf("[app:lodgenet2n64] SNES mode: %s\n",
+                   snes_stick_mode ? "stick" : "d-pad");
+        }
+        order_was_pressed = order_pressed;
+    }
 
     // Update LED status
     led_status_update();

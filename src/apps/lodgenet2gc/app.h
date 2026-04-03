@@ -44,7 +44,7 @@
 #define LODGENET_PIN_CLOCK2 5   // CLK2 output (SNES SR protocol only)
 
 // GC joybus data line (default from gamecube_device.h)
-// GC_DATA_PIN = 7
+// GC_DATA_PIN = 7 (default from gamecube_device.h)
 
 // ============================================================================
 // ROUTING CONFIGURATION

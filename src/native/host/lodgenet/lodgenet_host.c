@@ -43,6 +43,7 @@ static lodgenet_device_t device_type = LODGENET_DEVICE_NONE;
 
 // Connection tracking — matches reference exactly
 static bool connected = false;
+static uint32_t last_buttons = 0;
 static uint8_t fail_count = 0;
 static uint8_t good_count = 0;
 
@@ -247,6 +248,7 @@ static void submit_mcu(uint8_t *bytes, bool is_gc)
     event.analog[ANALOG_RY] = stick_ry;
     event.analog[ANALOG_L2] = trigger_l;
     event.analog[ANALOG_R2] = trigger_r;
+    last_buttons = event.buttons;
     router_submit_input(&event);
 }
 
@@ -305,6 +307,7 @@ static void submit_snes(uint16_t value)
     event.buttons = buttons;
     event.analog[ANALOG_LX] = 128;
     event.analog[ANALOG_LY] = 128;
+    last_buttons = event.buttons;
     router_submit_input(&event);
 }
 
@@ -403,6 +406,7 @@ void lodgenet_host_task(void)
             if (connected) {
                 connected = false;
                 device_type = LODGENET_DEVICE_NONE;
+                last_buttons = 0;
                 // Send cleared event
                 input_event_t event;
                 init_input_event(&event);
@@ -444,6 +448,7 @@ void lodgenet_host_task(void)
             if (connected) {
                 connected = false;
                 device_type = LODGENET_DEVICE_NONE;
+                last_buttons = 0;
                 input_event_t event;
                 init_input_event(&event);
                 event.dev_addr = 0xF0;
@@ -468,6 +473,11 @@ bool lodgenet_host_is_connected(void)
 lodgenet_device_t lodgenet_host_get_device_type(void)
 {
     return device_type;
+}
+
+uint32_t lodgenet_host_get_buttons(void)
+{
+    return last_buttons;
 }
 
 // ============================================================================

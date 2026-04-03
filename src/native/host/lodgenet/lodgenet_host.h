@@ -65,6 +65,9 @@ bool lodgenet_host_is_connected(void);
 // Get detected device type
 lodgenet_device_t lodgenet_host_get_device_type(void);
 
+// Get last raw button state (JP_BUTTON_* bitmap)
+uint32_t lodgenet_host_get_buttons(void);
+
 // Input interface for app declaration
 extern const InputInterface lodgenet_input_interface;
 
