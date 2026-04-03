@@ -350,9 +350,15 @@ void lodgenet_host_init_pins(uint8_t clock, uint8_t data, uint8_t clock2, uint8_
     gpio_set_dir(pin_clock2, GPIO_OUT);
     gpio_put(pin_clock2, 1);
 
-    // Claim PIO SM — with CONFIG_NO_NEOPIXEL, SM0 is free (matching reference)
-    pio_hw = pio0;
-    pio_sm = pio_claim_unused_sm(pio_hw, true);
+    // Claim PIO SM — prefer PIO1 to avoid conflicts with output devices on PIO0
+    int sm = pio_claim_unused_sm(pio1, false);
+    if (sm >= 0) {
+        pio_hw = pio1;
+        pio_sm = (uint)sm;
+    } else {
+        pio_hw = pio0;
+        pio_sm = pio_claim_unused_sm(pio_hw, true);
+    }
 
     // Start with MCU protocol
     current_program = NULL;
