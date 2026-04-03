@@ -22,8 +22,8 @@ Reads Nintendo LodgeNet hotel controllers via a proprietary 3-wire serial protoc
 | Player slots | 1 (fixed) |
 | LodgeNet Clock pin | GPIO 3 |
 | LodgeNet Data pin | GPIO 2 |
-| LodgeNet VCC pin | GPIO 8 |
-| LodgeNet Clock2 pin | GPIO 9 (SNES SR protocol) |
+| LodgeNet VCC pin | GPIO 4 |
+| LodgeNet Clock2 pin | GPIO 5 (SNES SR protocol) |
 | GC Data pin | GPIO 7 |
 | Clock | 130MHz (overclock for joybus timing) |
 | Connector (input) | RJ11 6P6C |
@@ -89,13 +89,10 @@ make flash-lodgenet2gc_pico
 |----------|------|----------|
 | 4 | GPIO 2 | LodgeNet DATA (input from controller) |
 | 5 | GPIO 3 | LodgeNet CLK (output to controller) |
-| 11 | GPIO 8 | LodgeNet VCC (powers controller) |
-| 12 | GPIO 9 | LodgeNet CLK2 (SNES SR protocol) |
+| 6 | GPIO 4 | LodgeNet VCC (powers controller) |
+| 7 | GPIO 5 | LodgeNet CLK2 (SNES SR protocol) |
 | 10 | GPIO 7 | GC joybus data (bidirectional) |
 | 40 | VBUS | 5V power from GC console |
 | 38 | GND | Ground |
 
-Connect the RJ11 LodgeNet connector to GPIOs 2, 3, 8, 9 and the GameCube controller port data line to GPIO 7. Power the Pico from the GameCube console's 5V supply via VBUS.
-
-!!! note "Pin difference from lodgenet2usb"
-    VCC and CLK2 use GPIO 8/9 instead of 4/5 to avoid conflict with the GameCube device's shield pin initialization (GPIO 4/5).
+Connect the RJ11 LodgeNet connector to GPIOs 2-5 and the GameCube controller port data line to GPIO 7. Power the Pico from the GameCube console's 5V supply via VBUS. Same LodgeNet pinout as lodgenet2usb and lodgenet2n64.

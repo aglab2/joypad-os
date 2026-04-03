@@ -40,8 +40,8 @@
 // shield pins (4,5,26,27), BOOTSEL (11), or UART (12,13).
 #define LODGENET_PIN_CLOCK  3   // CLK1 output to controller
 #define LODGENET_PIN_DATA   2   // Data input from controller
-#define LODGENET_PIN_VCC    8   // VCC output (powers controller)
-#define LODGENET_PIN_CLOCK2 9   // CLK2 output (SNES SR protocol only)
+#define LODGENET_PIN_VCC    4   // VCC output (powers controller)
+#define LODGENET_PIN_CLOCK2 5   // CLK2 output (SNES SR protocol only)
 
 // GC joybus data line (default from gamecube_device.h)
 // GC_DATA_PIN = 7

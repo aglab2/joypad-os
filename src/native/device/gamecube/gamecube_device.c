@@ -206,7 +206,8 @@ void ngc_init()
   // Profile system is initialized by app - just set up callbacks
   profile_set_player_count_callback(gc_get_player_count_for_profile);
 
-  // Ground gpio attatched to sheilding
+  #ifdef CONFIG_NGC
+  // KB2040-specific hardware: ground shield GPIOs, BOOTSEL button, 3V3 detect
   gpio_init(SHIELD_PIN_L);
   gpio_set_dir(SHIELD_PIN_L, GPIO_OUT);
   gpio_init(SHIELD_PIN_L+1);
@@ -221,13 +222,10 @@ void ngc_init()
   gpio_put(SHIELD_PIN_R, 0);
   gpio_put(SHIELD_PIN_R+1, 0);
 
-  // Initialize the BOOTSEL_PIN as input
   gpio_init(BOOTSEL_PIN);
   gpio_set_dir(BOOTSEL_PIN, GPIO_IN);
   gpio_pull_up(BOOTSEL_PIN);
-
-  // GC 3.3V check is now handled by the app layer (app_get_output_interfaces)
-  // ngc_init() is only called when GC 3.3V is detected (play mode)
+  #endif
 
   int sm = -1;
   int offset = -1;
