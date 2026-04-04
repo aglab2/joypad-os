@@ -340,6 +340,15 @@ void app_task(void)
         extern volatile uint32_t n64_diag_total_reads, n64_diag_total_writes;
         extern volatile uint32_t n64_diag_total_probes, n64_diag_total_unknown;
         extern volatile uint32_t n64_diag_read_addr_fail, n64_diag_write_buf_fail;
+        extern volatile uint8_t n64_cmd_history[];
+        extern volatile uint8_t n64_cmd_history_count;
+        if (n64_cmd_history_count > 0) {
+            printf("[diag] HIST(%d):", n64_cmd_history_count);
+            for (int i = 0; i < n64_cmd_history_count && i < 40; i++) {
+                printf(" %02x", n64_cmd_history[i]);
+            }
+            printf("\n");
+        }
         printf("[diag] TOTAL: probes=%lu rd=%lu wr=%lu unk=%lu(0x%02x) rdFail=%lu wrFail=%lu\n",
                (unsigned long)n64_diag_total_probes,
                (unsigned long)n64_diag_total_reads,
