@@ -263,38 +263,25 @@ void app_task(void)
     }
 
     // Forward rumble from N64 console to BT controllers
-    // N64 games use 60Hz PWM: toggling motor ON/OFF each frame for variable
-    // intensity. Real rumble pak motor has inertia and is weak. BT controllers
-    // are stronger and more responsive. Track duty cycle over a rolling window
-    // and scale intensity proportionally to simulate motor inertia.
+    // Simple passthrough with heartbeat toggle every 2s to prevent
+    // Xbox BLE controllers from auto-stopping (5s internal timeout).
     if (n64_output_interface.get_rumble) {
-        #define RUMBLE_WINDOW 8  // Sample window (~133ms at 60Hz)
-        static uint8_t rumble_history[RUMBLE_WINDOW];
-        static uint8_t rumble_idx = 0;
-        static uint32_t rumble_last_sample = 0;
+        static uint32_t rumble_heartbeat = 0;
+        static uint8_t toggle = 0;
+        uint8_t rumble = n64_output_interface.get_rumble();
         uint32_t now = platform_time_ms();
 
-        // Sample at ~60Hz (every 16ms) to match N64 frame rate
-        if (now - rumble_last_sample >= 16) {
-            rumble_last_sample = now;
-            rumble_history[rumble_idx] = n64_output_interface.get_rumble() ? 1 : 0;
-            rumble_idx = (rumble_idx + 1) % RUMBLE_WINDOW;
+        if (rumble && (now - rumble_heartbeat > 2000)) {
+            rumble_heartbeat = now;
+            toggle = !toggle;
+        }
+        if (!rumble) {
+            rumble_heartbeat = now;
+            toggle = 0;
         }
 
-        // Calculate duty cycle: count ON samples in window
-        uint8_t on_count = 0;
-        for (int i = 0; i < RUMBLE_WINDOW; i++) {
-            on_count += rumble_history[i];
-        }
-
-        // Scale intensity by duty cycle. Max ~80% to avoid overpowering.
-        // Minimum 2 ON samples to filter pak init pulses.
-        uint8_t left = 0, right = 0;
-        if (on_count >= 2) {
-            left = (on_count * 100) / RUMBLE_WINDOW;
-            right = (on_count * 25) / RUMBLE_WINDOW;
-        }
-
+        uint8_t left = rumble ? (50 + toggle) : 0;
+        uint8_t right = rumble ? 15 : 0;
         for (int i = 0; i < playersCount; i++) {
             feedback_set_rumble(i, left, right);
         }
@@ -363,26 +350,6 @@ void app_task(void)
                n64_diag_write_data[0], n64_diag_write_data[1],
                n64_diag_write_data[2], n64_diag_write_data[3],
                edges);
-        extern volatile uint32_t n64_diag_total_reads, n64_diag_total_writes;
-        extern volatile uint32_t n64_diag_total_probes, n64_diag_total_unknown;
-        extern volatile uint32_t n64_diag_read_addr_fail, n64_diag_write_buf_fail;
-        extern volatile uint8_t n64_cmd_history[];
-        extern volatile uint8_t n64_cmd_history_count;
-        if (n64_cmd_history_count > 0) {
-            printf("[diag] HIST(%d):", n64_cmd_history_count);
-            for (int i = 0; i < n64_cmd_history_count && i < 40; i++) {
-                printf(" %02x", n64_cmd_history[i]);
-            }
-            printf("\n");
-        }
-        printf("[diag] TOTAL: probes=%lu rd=%lu wr=%lu unk=%lu(0x%02x) rdFail=%lu wrFail=%lu\n",
-               (unsigned long)n64_diag_total_probes,
-               (unsigned long)n64_diag_total_reads,
-               (unsigned long)n64_diag_total_writes,
-               (unsigned long)n64_diag_total_unknown,
-               n64_diag_last_cmd,
-               (unsigned long)n64_diag_read_addr_fail,
-               (unsigned long)n64_diag_write_buf_fail);
     }
 
     // Update LED status
