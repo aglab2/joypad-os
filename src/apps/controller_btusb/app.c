@@ -55,6 +55,13 @@ extern void le_device_db_remove(int index);
 #include "drivers/joywing/joywing_input.h"
 #endif
 
+#ifdef SENSOR_PAD
+#include "pad/pad_input.h"
+#ifdef PAD_CONFIG_ABB
+#include "pad/configs/abb.h"
+#endif
+#endif
+
 // OLED display + Joy animation (conditional)
 #if defined(OLED_I2C_INST) || defined(OLED_I2C_DISPLAY)
 #include "core/services/display/display.h"
@@ -138,6 +145,9 @@ static void on_button_event(button_event_t event)
 // ============================================================================
 
 static const InputInterface* input_interfaces[] = {
+#ifdef SENSOR_PAD
+    &pad_input_interface,
+#endif
 #ifdef SENSOR_JOYWING
     &joywing_input_interface,
 #endif
@@ -177,6 +187,14 @@ void app_init(void)
     // Initialize button service
     button_init();
     button_set_callback(on_button_event);
+
+    // Configure pad input (GPIO buttons)
+#ifdef SENSOR_PAD
+#ifdef PAD_CONFIG_ABB
+    pad_input_add_device(&pad_config_abb);
+    printf("[app:controller_btusb] Pad: RP2040 Advanced Breakout Board\n");
+#endif
+#endif
 
     // Configure sensor inputs
 #ifdef SENSOR_JOYWING
