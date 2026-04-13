@@ -50,6 +50,11 @@ extern int le_device_db_max_count(void);
 extern void le_device_db_remove(int index);
 #endif
 
+// USB host input (conditional)
+#ifndef DISABLE_USB_HOST
+#include "usb/usbh/usbh.h"
+#endif
+
 // Sensor inputs (conditional)
 #ifdef SENSOR_JOYWING
 #include "drivers/joywing/joywing_input.h"
@@ -146,6 +151,9 @@ static void on_button_event(button_event_t event)
 // ============================================================================
 
 static const InputInterface* input_interfaces[] = {
+#ifndef DISABLE_USB_HOST
+    &usbh_input_interface,
+#endif
 #ifdef SENSOR_PAD
     &pad_input_interface,
 #endif
@@ -237,6 +245,14 @@ void app_init(void)
 
     // Route: GPIO (sensors) → USB Device (CDC config + wired gamepad)
     router_add_route(INPUT_SOURCE_GPIO, OUTPUT_TARGET_USB_DEVICE, 0);
+
+#ifndef DISABLE_USB_HOST
+    // Route: USB Host controllers → USB Device
+    router_add_route(INPUT_SOURCE_USB_HOST, OUTPUT_TARGET_USB_DEVICE, 0);
+#if REQUIRE_BLE_OUTPUT
+    router_add_route(INPUT_SOURCE_USB_HOST, OUTPUT_TARGET_BLE_PERIPHERAL, 0);
+#endif
+#endif
 
     // Configure player management
     player_config_t player_cfg = {

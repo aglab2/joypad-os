@@ -1551,15 +1551,14 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     pico_enable_stdio_uart(joypad_wifi2usb 1)
 endif()
 
-# --- Controller for ABB (RP2040 Advanced Breakout Board) ---
-# ABB is a plain RP2040 with no BT antenna — USB device output only.
-# Uses controller_btusb app with REQUIRE_BLE_OUTPUT=0 so all BT init is skipped.
+# --- Controller for ABB (RP2040 Advanced Breakout Board - Passthrough) ---
+# ABB is a plain RP2040 with no BT antenna — USB device output only, no BLE.
+# USB host via PIO-USB on GPIO 23/24 (USB-A passthrough port, slider in USB position).
 add_executable(joypad_controller_btusb_rp2040_abb)
 target_compile_definitions(joypad_controller_btusb_rp2040_abb PRIVATE
     CONFIG_CONTROLLER_BTUSB=1
     CONFIG_USB=1
     CONFIG_PAD_INPUT=1
-    DISABLE_USB_HOST=1
     USE_BOOTSEL_BUTTON=1
     REQUIRE_BLE_OUTPUT=0
     SENSOR_PAD=1
@@ -1567,9 +1566,13 @@ target_compile_definitions(joypad_controller_btusb_rp2040_abb PRIVATE
     SENSOR_JOYWING=1
     BOARD_LED_PIN=25
     BOARD_NAME="abb"
+    PICO_DEFAULT_PIO_USB_DP_PIN=23
+    PIO_USB_DP_PIN_DEFAULT=23
+    BOARD_TUH_RHPORT=1
 )
 target_sources(joypad_controller_btusb_rp2040_abb PUBLIC
     ${CORE_SOURCES}
+    ${USB_HOST_SOURCES}
     ${USB_DEVICE_SOURCES}
     ${CONTROLLER_SOURCES}
     ${CMAKE_CURRENT_SOURCE_DIR}/stubs_peripheral.c
@@ -1594,6 +1597,9 @@ target_link_libraries(joypad_controller_btusb_rp2040_abb PRIVATE
     hardware_spi
     tinyusb_device
     tinyusb_board
+    tinyusb_host
+    tinyusb_pico_pio_usb
+    xinput_host
 )
 joypad_target_common(joypad_controller_btusb_rp2040_abb)
 pico_enable_stdio_usb(joypad_controller_btusb_rp2040_abb 0)

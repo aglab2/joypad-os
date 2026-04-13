@@ -508,6 +508,18 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
    PAD GPIO CONFIG
    ================================================================ */
 
+/* Mode warning */
+.mode-warning {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid var(--warning);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--warning);
+    line-height: 1.5;
+}
+
 .pad-pin-grid { display: grid; gap: 6px; }
 
 .pad-pin-row {
