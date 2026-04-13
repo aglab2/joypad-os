@@ -1827,6 +1827,21 @@ void cdc_commands_send_input_event(uint32_t buttons, const uint8_t* axes)
 {
     if (!stream_ctx || !stream_ctx->input_streaming) return;
 
+    // Throttle: only send when state changes or at ~60Hz max
+    // Prevents flooding CDC when pad_input polls at main loop rate (10kHz+)
+    static uint32_t last_buttons = 0xFFFFFFFF;
+    static uint8_t last_axes[7] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    static uint32_t last_send_ms = 0;
+
+    uint32_t now = platform_time_ms();
+    bool changed = (buttons != last_buttons || memcmp(axes, last_axes, 7) != 0);
+
+    if (!changed && (now - last_send_ms) < 16) return;  // ~60Hz idle rate
+
+    last_buttons = buttons;
+    memcpy(last_axes, axes, 7);
+    last_send_ms = now;
+
     // Input axes from input_event_t (now contiguous):
     // [0]=LX, [1]=LY, [2]=RX, [3]=RY, [4]=L2, [5]=R2, [6]=RZ
     snprintf(response_buf, sizeof(response_buf),
