@@ -109,7 +109,7 @@ CONSOLE_controller_alpakka := joypad_controller_alpakka
 CONSOLE_controller_macropad := joypad_controller_macropad
 CONSOLE_bt2gc := joypad_bt2gc
 CONSOLE_controller_btusb := joypad_controller_btusb
-CONSOLE_controller_btusb_abb := joypad_controller_btusb_abb
+CONSOLE_controller_btusb_rp2040_abb := joypad_controller_btusb_rp2040_abb
 CONSOLE_controller_btusb_feather_rp2040 := joypad_controller_btusb_feather_rp2040
 
 
@@ -178,7 +178,7 @@ APP_controller_alpakka_pico := pico controller_alpakka controller_alpakka_pico G
 APP_controller_macropad := macropad controller_macropad controller_macropad GPIO USB
 APP_controller_btusb_pico_w := pico_w controller_btusb controller_btusb_pico_w JoyWing BLE/USB
 APP_controller_btusb_pico2_w := pico2_w controller_btusb controller_btusb_pico2_w JoyWing BLE/USB
-APP_controller_btusb_abb := pico_w controller_btusb_abb controller_btusb_abb ABB BLE/USB
+APP_controller_btusb_rp2040_abb := pico controller_btusb_rp2040_abb controller_btusb_rp2040_abb ABB USB
 APP_controller_btusb_feather_rp2040 := feather controller_btusb_feather_rp2040 controller_btusb_feather_rp2040 JoyWing USB
 
 
@@ -873,9 +873,9 @@ controller_btusb_pico_w:
 controller_btusb_pico2_w:
 	$(call build_app,controller_btusb_pico2_w)
 
-.PHONY: controller_btusb_abb
-controller_btusb_abb:
-	$(call build_app,controller_btusb_abb)
+.PHONY: controller_btusb_rp2040_abb
+controller_btusb_rp2040_abb:
+	$(call build_app,controller_btusb_rp2040_abb)
 
 .PHONY: controller_btusb_feather_rp2040
 controller_btusb_feather_rp2040:
@@ -1243,9 +1243,9 @@ flash-controller_btusb_pico_w:
 flash-controller_btusb_pico2_w:
 	@$(MAKE) --no-print-directory _flash_app APP_NAME=controller_btusb_pico2_w
 
-.PHONY: flash-controller_btusb_abb
-flash-controller_btusb_abb:
-	@$(MAKE) --no-print-directory _flash_app APP_NAME=controller_btusb_abb
+.PHONY: flash-controller_btusb_rp2040_abb
+flash-controller_btusb_rp2040_abb:
+	@$(MAKE) --no-print-directory _flash_app APP_NAME=controller_btusb_rp2040_abb
 
 .PHONY: flash-controller_btusb_feather_rp2040
 flash-controller_btusb_feather_rp2040:

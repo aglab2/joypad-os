@@ -50,7 +50,7 @@ static const pad_device_config_t pad_config_abb = {
     .l4 = PAD_PIN_DISABLED,
     .r4 = PAD_PIN_DISABLED,
 
-    // No D-pad toggle switch
+    // No D-pad toggle switch (screw terminal toggles are user-configurable via web config)
     .dpad_toggle = PAD_PIN_DISABLED,
 
     // No analog sticks (ADC pins 26-29 available but not wired by default)

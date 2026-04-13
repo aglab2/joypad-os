@@ -165,6 +165,15 @@ body {
     background: var(--border);
 }
 
+.header-link {
+    text-decoration: none;
+    color: var(--text-muted);
+}
+.header-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 .header-status {
     display: flex;
     align-items: center;
@@ -559,7 +568,7 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
     padding: 16px;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 12px;
-    max-height: 400px;
+    max-height: calc(100vh - 200px);
     overflow-y: auto;
 }
 

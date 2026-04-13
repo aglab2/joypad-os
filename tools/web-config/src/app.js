@@ -161,6 +161,14 @@ class JoypadConfigApp {
         });
 
         this.currentPage = pageId;
+
+        // Persist in URL hash for reload
+        history.replaceState(null, '', '#' + pageId);
+    }
+
+    getInitialPage() {
+        const hash = location.hash.replace('#', '');
+        return (hash && PAGE_GROUPS[hash]) ? hash : 'device-info';
     }
 
     getFirstVisiblePage(group) {
@@ -275,7 +283,7 @@ class JoypadConfigApp {
         await this.profiles.load();
         await this.wiimote.load();
         // Navigate to default page
-        this.navigateTo('device-info');
+        this.navigateTo(this.getInitialPage());
     }
 
     // ================================================================

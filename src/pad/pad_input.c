@@ -254,12 +254,17 @@ static void pad_init_device_pins(const pad_device_config_t* config) {
     pad_init_button_pin(config->l4, ah);
     pad_init_button_pin(config->r4, ah);
 
-    // Initialize toggle switch pin (always active high - switch to VCC when on)
+    // Initialize toggle switch pin
     if (config->dpad_toggle >= 0 && config->dpad_toggle <= 29) {
         gpio_init(config->dpad_toggle);
         gpio_set_dir(config->dpad_toggle, GPIO_IN);
-        gpio_pull_down(config->dpad_toggle);  // Pull down, switch connects to VCC when on
-        printf("[pad] D-pad toggle switch on GPIO %d\n", config->dpad_toggle);
+        if (config->dpad_toggle_invert) {
+            gpio_pull_up(config->dpad_toggle);    // Inverted: switch connects to GND
+        } else {
+            gpio_pull_down(config->dpad_toggle);  // Normal: switch connects to VCC
+        }
+        printf("[pad] D-pad toggle switch on GPIO %d%s\n", config->dpad_toggle,
+               config->dpad_toggle_invert ? " (inverted)" : "");
     }
 
     // Initialize ADC if any analog inputs are used

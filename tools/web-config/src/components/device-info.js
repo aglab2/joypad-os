@@ -31,8 +31,14 @@ export class DeviceInfoCard {
             // Header bar (compact)
             const headerApp = document.getElementById('headerApp');
             const headerBoard = document.getElementById('headerBoard');
-            if (headerApp) headerApp.textContent = info.app || 'Joypad';
-            if (headerBoard) headerBoard.textContent = `${info.board || '-'} \u2022 ${(info.commit || '-').substring(0, 7)}`;
+            if (headerApp) headerApp.textContent = `${info.app || 'Joypad'} v${info.version || '?'}`;
+            if (headerBoard) headerBoard.textContent = info.board || '-';
+            const headerCommit = document.getElementById('headerCommit');
+            if (headerCommit) {
+                const hash = (info.commit || '-').substring(0, 7);
+                headerCommit.textContent = hash;
+                headerCommit.href = `https://github.com/joypad-ai/joypad-os/commit/${info.commit}`;
+            }
 
             // Full detail card
             this.setText('deviceApp', info.app);

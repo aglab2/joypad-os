@@ -124,14 +124,39 @@ export class PadConfigCard {
         });
     }
 
-    buildPinSelect(id, value) {
+    hasI2C() {
+        const sda = parseInt(this.el.querySelector('#padI2cSda')?.value ?? -1);
+        const scl = parseInt(this.el.querySelector('#padI2cScl')?.value ?? -1);
+        return sda >= 0 && scl >= 0;
+    }
+
+    buildPinSelect(id, value, includeI2C) {
         let html = `<select id="${id}" class="pad-pin-select">`;
         html += '<option value="-1">Disabled</option>';
         for (let i = 0; i <= 29; i++) html += `<option value="${i}"${value === i ? ' selected' : ''}>GPIO ${i}</option>`;
-        for (let i = 100; i <= 115; i++) html += `<option value="${i}"${value === i ? ' selected' : ''}>I2C0 P${i - 100}</option>`;
-        for (let i = 200; i <= 215; i++) html += `<option value="${i}"${value === i ? ' selected' : ''}>I2C1 P${i - 200}</option>`;
+        if (includeI2C) {
+            for (let i = 100; i <= 115; i++) html += `<option value="${i}"${value === i ? ' selected' : ''}>I2C0 P${i - 100}</option>`;
+            for (let i = 200; i <= 215; i++) html += `<option value="${i}"${value === i ? ' selected' : ''}>I2C1 P${i - 200}</option>`;
+        }
         html += '</select>';
         return html;
+    }
+
+    rebuildPinSelects() {
+        const includeI2C = this.hasI2C();
+        const container = this.el.querySelector('#padButtonPins');
+        if (!container) return;
+        // Preserve current values
+        const values = [];
+        for (let i = 0; i < 20; i++) {
+            const sel = this.el.querySelector('#padBtn' + i);
+            values.push(sel ? parseInt(sel.value) : -1);
+        }
+        container.innerHTML = PAD_BUTTON_NAMES.map((name, i) =>
+            `<div class="pad-pin-row"><span>${name}</span>${this.buildPinSelect('padBtn' + i, values[i], includeI2C)}</div>`
+        ).join('');
+        container.addEventListener('change', () => this.checkConflicts());
+        this.checkConflicts();
     }
 
     async load() {
@@ -151,11 +176,20 @@ export class PadConfigCard {
                 config.source === 'flash' ? 'Custom (Flash)' : `Default: ${config.name}`;
             this.el.querySelector('#padActiveHigh').value = String(config.active_high || false);
 
+            // I2C (set before button pins so buildPinSelect can check hasI2C)
+            this.el.querySelector('#padI2cSda').value = config.i2c_sda !== undefined ? config.i2c_sda : -1;
+            this.el.querySelector('#padI2cScl').value = config.i2c_scl !== undefined ? config.i2c_scl : -1;
+
+            // Rebuild pin selects when I2C config changes
+            this.el.querySelector('#padI2cSda').addEventListener('change', () => this.rebuildPinSelects());
+            this.el.querySelector('#padI2cScl').addEventListener('change', () => this.rebuildPinSelects());
+
             // Button pins
             const container = this.el.querySelector('#padButtonPins');
             const buttons = config.buttons || [];
+            const includeI2C = this.hasI2C();
             container.innerHTML = PAD_BUTTON_NAMES.map((name, i) =>
-                `<div class="pad-pin-row"><span>${name}</span>${this.buildPinSelect('padBtn' + i, buttons[i] !== undefined ? buttons[i] : -1)}</div>`
+                `<div class="pad-pin-row"><span>${name}</span>${this.buildPinSelect('padBtn' + i, buttons[i] !== undefined ? buttons[i] : -1, includeI2C)}</div>`
             ).join('');
 
             // D-pad toggle
@@ -176,10 +210,6 @@ export class PadConfigCard {
             // Deadzone
             this.el.querySelector('#padDeadzone').value = config.deadzone || 10;
             this.el.querySelector('#padDeadzoneValue').textContent = config.deadzone || 10;
-
-            // I2C
-            this.el.querySelector('#padI2cSda').value = config.i2c_sda !== undefined ? config.i2c_sda : -1;
-            this.el.querySelector('#padI2cScl').value = config.i2c_scl !== undefined ? config.i2c_scl : -1;
 
             // LED
             this.el.querySelector('#padLedPin').value = config.led_pin !== undefined ? config.led_pin : -1;

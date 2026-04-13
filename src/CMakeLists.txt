@@ -1506,56 +1506,6 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     pico_enable_stdio_usb(joypad_controller_btusb 0)
     pico_enable_stdio_uart(joypad_controller_btusb 1)
 
-    # --- Controller BTUSB for ABB (RP2040 Advanced Breakout Board) ---
-    # --- Controller BTUSB for ABB (RP2040 Advanced Breakout Board) ---
-    # ABB has no BT antenna — USB device output only, no BLE peripheral.
-    # Uses controller_btusb app with REQUIRE_BLE_OUTPUT=0 so all BT init is skipped.
-    # Built against pico_w SDK for CYW43 header compatibility but doesn't init CYW43.
-    add_executable(joypad_controller_btusb_abb)
-    target_compile_definitions(joypad_controller_btusb_abb PRIVATE
-        CONFIG_CONTROLLER_BTUSB=1
-        CONFIG_USB=1
-        CONFIG_PAD_INPUT=1
-        DISABLE_USB_HOST=1
-        USE_BOOTSEL_BUTTON=1
-        REQUIRE_BLE_OUTPUT=0
-        SENSOR_PAD=1
-        PAD_CONFIG_ABB=1
-        SENSOR_JOYWING=1
-        BOARD_LED_PIN=25
-        BOARD_NAME="abb"
-    )
-    target_sources(joypad_controller_btusb_abb PUBLIC
-        ${CORE_SOURCES}
-        ${USB_DEVICE_SOURCES}
-        ${CONTROLLER_SOURCES}
-        ${CMAKE_CURRENT_SOURCE_DIR}/stubs_peripheral.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/joywing/joywing_input.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/seesaw/seesaw.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/platform/rp2040/platform_i2c_rp2040.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/apps/controller_btusb/app.c
-    )
-    target_include_directories(joypad_controller_btusb_abb PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/apps/controller_btusb
-        ${CMAKE_CURRENT_SOURCE_DIR}/usb/usbd
-        ${CMAKE_CURRENT_SOURCE_DIR}/pad
-    )
-    target_link_libraries(joypad_controller_btusb_abb PRIVATE
-        pico_stdlib
-        pico_multicore
-        pico_rand
-        hardware_pio
-        hardware_i2c
-        hardware_adc
-        hardware_pwm
-        hardware_spi
-        tinyusb_device
-        tinyusb_board
-    )
-    joypad_target_common(joypad_controller_btusb_abb)
-    pico_enable_stdio_usb(joypad_controller_btusb_abb 0)
-    pico_enable_stdio_uart(joypad_controller_btusb_abb 1)
-
     # --- WiFi to USB (Pico W / Pico 2 W WiFi AP mode) ---
     add_executable(joypad_wifi2usb)
     target_compile_definitions(joypad_wifi2usb PRIVATE
@@ -1600,6 +1550,54 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     pico_enable_stdio_usb(joypad_wifi2usb 0)
     pico_enable_stdio_uart(joypad_wifi2usb 1)
 endif()
+
+# --- Controller for ABB (RP2040 Advanced Breakout Board) ---
+# ABB is a plain RP2040 with no BT antenna — USB device output only.
+# Uses controller_btusb app with REQUIRE_BLE_OUTPUT=0 so all BT init is skipped.
+add_executable(joypad_controller_btusb_rp2040_abb)
+target_compile_definitions(joypad_controller_btusb_rp2040_abb PRIVATE
+    CONFIG_CONTROLLER_BTUSB=1
+    CONFIG_USB=1
+    CONFIG_PAD_INPUT=1
+    DISABLE_USB_HOST=1
+    USE_BOOTSEL_BUTTON=1
+    REQUIRE_BLE_OUTPUT=0
+    SENSOR_PAD=1
+    PAD_CONFIG_ABB=1
+    SENSOR_JOYWING=1
+    BOARD_LED_PIN=25
+    BOARD_NAME="abb"
+)
+target_sources(joypad_controller_btusb_rp2040_abb PUBLIC
+    ${CORE_SOURCES}
+    ${USB_DEVICE_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs_peripheral.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/joywing/joywing_input.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/seesaw/seesaw.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/rp2040/platform_i2c_rp2040.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/apps/controller_btusb/app.c
+)
+target_include_directories(joypad_controller_btusb_rp2040_abb PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/apps/controller_btusb
+    ${CMAKE_CURRENT_SOURCE_DIR}/usb/usbd
+    ${CMAKE_CURRENT_SOURCE_DIR}/pad
+)
+target_link_libraries(joypad_controller_btusb_rp2040_abb PRIVATE
+    pico_stdlib
+    pico_multicore
+    pico_rand
+    hardware_pio
+    hardware_i2c
+    hardware_adc
+    hardware_pwm
+    hardware_spi
+    tinyusb_device
+    tinyusb_board
+)
+joypad_target_common(joypad_controller_btusb_rp2040_abb)
+pico_enable_stdio_usb(joypad_controller_btusb_rp2040_abb 0)
+pico_enable_stdio_uart(joypad_controller_btusb_rp2040_abb 1)
 
 # --- SNES to USB ---
 add_executable(joypad_snes2usb)
