@@ -342,8 +342,20 @@ function(joypad_target_common TARGET)
         JOYPAD_VERSION="${JOYPAD_VERSION}"
         GIT_COMMIT="${GIT_COMMIT}"
         BUILD_TIME="${BUILD_TIME}"
-        BOARD_NAME="${PICO_BOARD}"
     )
+    # Set BOARD_NAME only if not already defined by the target
+    get_target_property(_defs ${TARGET} COMPILE_DEFINITIONS)
+    set(_has_board_name FALSE)
+    if(_defs)
+        foreach(_def ${_defs})
+            if(_def MATCHES "^BOARD_NAME=")
+                set(_has_board_name TRUE)
+            endif()
+        endforeach()
+    endif()
+    if(NOT _has_board_name)
+        target_compile_definitions(${TARGET} PRIVATE BOARD_NAME="${PICO_BOARD}")
+    endif()
 endfunction()
 
 # Add BTstack support to a target
@@ -1495,6 +1507,10 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     pico_enable_stdio_uart(joypad_controller_btusb 1)
 
     # --- Controller BTUSB for ABB (RP2040 Advanced Breakout Board) ---
+    # --- Controller BTUSB for ABB (RP2040 Advanced Breakout Board) ---
+    # ABB has no BT antenna — USB device output only, no BLE peripheral.
+    # Uses controller_btusb app with REQUIRE_BLE_OUTPUT=0 so all BT init is skipped.
+    # Built against pico_w SDK for CYW43 header compatibility but doesn't init CYW43.
     add_executable(joypad_controller_btusb_abb)
     target_compile_definitions(joypad_controller_btusb_abb PRIVATE
         CONFIG_CONTROLLER_BTUSB=1
@@ -1502,14 +1518,12 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
         CONFIG_PAD_INPUT=1
         DISABLE_USB_HOST=1
         USE_BOOTSEL_BUTTON=1
-        CYW43_LWIP=0
-        BTSTACK_USE_CYW43=1
-        ENABLE_BTSTACK=1
-        REQUIRE_BLE_OUTPUT=1
+        REQUIRE_BLE_OUTPUT=0
         SENSOR_PAD=1
         PAD_CONFIG_ABB=1
         SENSOR_JOYWING=1
         BOARD_LED_PIN=25
+        BOARD_NAME="abb"
     )
     target_sources(joypad_controller_btusb_abb PUBLIC
         ${CORE_SOURCES}
@@ -1519,22 +1533,12 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
         ${CMAKE_CURRENT_SOURCE_DIR}/drivers/joywing/joywing_input.c
         ${CMAKE_CURRENT_SOURCE_DIR}/drivers/seesaw/seesaw.c
         ${CMAKE_CURRENT_SOURCE_DIR}/platform/rp2040/platform_i2c_rp2040.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/ble_output/ble_output.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/ble_output/ble_output_keyboard.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/ble_output/ble_output_mouse.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/ble_output/ble_output_xbox.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/ble_output/ble_nus.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/transport/bt_transport.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/transport/bt_transport_cyw43.c
         ${CMAKE_CURRENT_SOURCE_DIR}/apps/controller_btusb/app.c
     )
     target_include_directories(joypad_controller_btusb_abb PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/apps/controller_btusb
         ${CMAKE_CURRENT_SOURCE_DIR}/usb/usbd
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt
-        ${CMAKE_CURRENT_SOURCE_DIR}/bt/ble_output
         ${CMAKE_CURRENT_SOURCE_DIR}/pad
-        ${BTSTACK_INCLUDES}
     )
     target_link_libraries(joypad_controller_btusb_abb PRIVATE
         pico_stdlib
@@ -1547,13 +1551,7 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
         hardware_spi
         tinyusb_device
         tinyusb_board
-        pico_cyw43_arch_poll
-        pico_btstack_ble
-        pico_btstack_classic
-        pico_btstack_cyw43
-        controller_btusb_xbox_gatt
     )
-    pico_btstack_make_gatt_header(joypad_controller_btusb_abb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/bt/ble_output/ble_gamepad.gatt)
     joypad_target_common(joypad_controller_btusb_abb)
     pico_enable_stdio_usb(joypad_controller_btusb_abb 0)
     pico_enable_stdio_uart(joypad_controller_btusb_abb 1)

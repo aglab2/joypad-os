@@ -100,6 +100,24 @@ class WebSerialTransport {
         this._startReadLoop();
     }
 
+    /** Try reconnecting to a previously-granted port without user prompt */
+    async tryAutoConnect() {
+        const ports = await navigator.serial.getPorts();
+        if (ports.length === 0) return false;
+        this.port = ports[0];
+        try {
+            await this.port.open({ baudRate: 115200 });
+        } catch (e) {
+            // Port already open or unavailable
+            this.port = null;
+            return false;
+        }
+        this.writer = this.port.writable.getWriter();
+        this.reader = this.port.readable.getReader();
+        this._startReadLoop();
+        return true;
+    }
+
     async disconnect() {
         this.readLoopRunning = false;
         if (this.reader) {
@@ -279,6 +297,40 @@ class CDCProtocol {
     async connectSerial() {
         const transport = new WebSerialTransport();
         await this._connectWithTransport(transport);
+    }
+
+    /**
+     * Try auto-reconnect to a previously-granted serial port (no user prompt)
+     * Returns true if reconnected successfully
+     */
+    async tryAutoConnect() {
+        if (!WebSerialTransport.isSupported()) return false;
+        const transport = new WebSerialTransport();
+        transport.onData = (data) => {
+            const newBuffer = new Uint8Array(this.rxBuffer.length + data.length);
+            newBuffer.set(this.rxBuffer);
+            newBuffer.set(data, this.rxBuffer.length);
+            this.rxBuffer = newBuffer;
+            this._processBuffer();
+        };
+        transport.onDisconnect = () => {
+            this.connected = false;
+            this.transport = null;
+            for (const [seq, pending] of this.pendingCommands) {
+                pending.reject(new Error('Disconnected'));
+            }
+            this.pendingCommands.clear();
+            this.rxBuffer = new Uint8Array(0);
+            for (const cb of this.disconnectCallbacks) {
+                try { cb(); } catch (e) {}
+            }
+        };
+        const ok = await transport.tryAutoConnect();
+        if (ok) {
+            this.transport = transport;
+            this.connected = true;
+        }
+        return ok;
     }
 
     /**

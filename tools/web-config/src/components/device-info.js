@@ -1,25 +1,55 @@
-/** Device Info — renders into the header bar */
+/** Device Info — header bar summary + full detail page */
 export class DeviceInfoCard {
-    constructor(container, protocol, log) {
+    constructor(headerEl, cardEl, protocol, log) {
         this.protocol = protocol;
         this.log = log;
-        this.el = container;  // the .header-info element
+        this.headerEl = headerEl;   // .header-info element
+        this.cardEl = cardEl;       // #cardDeviceInfo container
     }
 
     render() {
-        // Header bar info is already in index.html — just target the spans
+        this.cardEl.innerHTML = `
+            <div class="card">
+                <h2>Device Information</h2>
+                <div class="card-content">
+                    <div class="device-info">
+                        <div class="row"><span class="label">App</span><span class="value" id="deviceApp">-</span></div>
+                        <div class="row"><span class="label">Version</span><span class="value" id="deviceVersion">-</span></div>
+                        <div class="row"><span class="label">Board</span><span class="value" id="deviceBoard">-</span></div>
+                        <div class="row"><span class="label">Serial</span><span class="value" id="deviceSerial">-</span></div>
+                        <div class="row"><span class="label">Commit</span><span class="value" id="deviceCommit">-</span></div>
+                        <div class="row"><span class="label">Build</span><span class="value" id="deviceBuild">-</span></div>
+                    </div>
+                </div>
+            </div>`;
     }
 
     async load() {
         try {
             const info = await this.protocol.getInfo();
-            const app = document.getElementById('headerApp');
-            const board = document.getElementById('headerBoard');
-            if (app) app.textContent = info.app || 'Joypad';
-            if (board) board.textContent = `${info.board || '-'} \u2022 ${(info.commit || '-').substring(0, 7)}`;
+
+            // Header bar (compact)
+            const headerApp = document.getElementById('headerApp');
+            const headerBoard = document.getElementById('headerBoard');
+            if (headerApp) headerApp.textContent = info.app || 'Joypad';
+            if (headerBoard) headerBoard.textContent = `${info.board || '-'} \u2022 ${(info.commit || '-').substring(0, 7)}`;
+
+            // Full detail card
+            this.setText('deviceApp', info.app);
+            this.setText('deviceVersion', info.version);
+            this.setText('deviceBoard', info.board);
+            this.setText('deviceSerial', info.serial);
+            this.setText('deviceCommit', info.commit);
+            this.setText('deviceBuild', info.build);
+
             this.log(`Device: ${info.app} v${info.version} (${info.board}, ${info.commit})`);
         } catch (e) {
             this.log(`Failed to get device info: ${e.message}`, 'error');
         }
+    }
+
+    setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value || '-';
     }
 }

@@ -10,7 +10,7 @@
 // ============================================================================
 // APP METADATA
 // ============================================================================
-#define APP_NAME "ControllerBTUSB"
+#define APP_NAME "controller_btusb"
 #define APP_VERSION "1.0.0"
 #define APP_DESCRIPTION "Controller to BLE+USB gamepad adapter"
 #define APP_AUTHOR "RobertDaleSmith"
@@ -60,8 +60,8 @@
 // ============================================================================
 // BOARD-SPECIFIC CONFIGURATION
 // ============================================================================
-#if defined(BTSTACK_USE_CYW43)
-    // Pico W / Pico 2 W: JoyWing on I2C0 (GP4=SDA, GP5=SCL)
+#if defined(BTSTACK_USE_CYW43) || defined(PAD_CONFIG_ABB)
+    // Pico W / Pico 2 W / ABB: JoyWing on I2C0 (GP4=SDA, GP5=SCL)
     #define JOYWING_I2C_BUS 0
     #define JOYWING_SDA_PIN 4
     #define JOYWING_SCL_PIN 5

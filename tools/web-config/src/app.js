@@ -14,19 +14,21 @@ import { AdvancedCard } from './components/advanced.js';
 
 // Page registry: maps page IDs to sidebar groups
 const PAGE_GROUPS = {
-    'modes':      'output',
-    'profiles':   'output',
-    'gpio':       'hardware',
-    'wiimote':    'hardware',
-    'input-test': 'debug',
-    'log':        'debug',
-    'advanced':   'system',
+    'device-info': 'device',
+    'modes':       'output',
+    'profiles':    'output',
+    'gpio':        'input',
+    'wiimote':     'input',
+    'input-test':  'debug',
+    'log':         'debug',
+    'advanced':    'system',
 };
 
 // First page in each group (for mobile tab navigation)
 const GROUP_FIRST_PAGE = {
+    'device':   'device-info',
     'output':   'modes',
-    'hardware': 'gpio',
+    'input': 'gpio',
     'debug':    'input-test',
     'system':   'advanced',
 };
@@ -35,7 +37,7 @@ class JoypadConfigApp {
     constructor() {
         this.protocol = new CDCProtocol();
         this.debugStreaming = false;
-        this.currentPage = 'modes';
+        this.currentPage = 'device-info';
         this.hasPadConfig = false;
 
         // Header / connection UI
@@ -48,7 +50,7 @@ class JoypadConfigApp {
 
         // Initialize components
         const log = (msg, type) => this.log(msg, type);
-        this.deviceInfo = new DeviceInfoCard(document.getElementById('headerInfo'), this.protocol, log);
+        this.deviceInfo = new DeviceInfoCard(document.getElementById('headerInfo'), document.getElementById('cardDeviceInfo'), this.protocol, log);
         this.modeSelect = new ModeSelectCard(document.getElementById('cardModeSelect'), this.protocol, log);
         this.padConfig = new PadConfigCard(document.getElementById('cardPadConfig'), this.protocol, log);
         this.profiles = new ProfilesCard(document.getElementById('cardProfiles'), this.protocol, log);
@@ -113,6 +115,22 @@ class JoypadConfigApp {
         if (!CDCProtocol.isSupported()) {
             this.log('Neither Web Serial nor Web Bluetooth supported in this browser', 'error');
             this.connectBtn.disabled = true;
+        }
+
+        // Try auto-reconnect to previously-granted serial port
+        this.tryAutoConnect();
+    }
+
+    async tryAutoConnect() {
+        try {
+            const ok = await this.protocol.tryAutoConnect();
+            if (ok) {
+                this.log('Auto-reconnected via USB', 'success');
+                this.updateConnectionUI(true);
+                await this.loadAll();
+            }
+        } catch (e) {
+            // Silently fail — user can connect manually
         }
     }
 
@@ -257,7 +275,7 @@ class JoypadConfigApp {
         await this.profiles.load();
         await this.wiimote.load();
         // Navigate to default page
-        this.navigateTo('modes');
+        this.navigateTo('device-info');
     }
 
     // ================================================================
