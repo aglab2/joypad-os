@@ -67,7 +67,8 @@ static void joywing_init(void)
     }
 
     // Initialize seesaw
-    seesaw_init(&seesaw, i2c_bus, SEESAW_ADDR_DEFAULT);
+    uint8_t addr = joywing_cfg.addr ? joywing_cfg.addr : SEESAW_ADDR_DEFAULT;
+    seesaw_init(&seesaw, i2c_bus, addr);
 
     // Check hardware ID
     uint8_t hw_id = seesaw_get_hw_id(&seesaw);

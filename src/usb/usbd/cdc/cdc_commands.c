@@ -1435,10 +1435,11 @@ static void cmd_pad_config_get(const char* json)
     }
 
     if (!config) {
-        snprintf(response_buf, sizeof(response_buf),
-                 "{\"ok\":true,\"source\":\"default\",\"name\":\"none\"}");
-        send_json(response_buf);
-        return;
+        // No config saved and no compile-time default — return empty defaults
+        // so the web config page still shows (user can create a config)
+        static const pad_device_config_t empty_config = PAD_CONFIG_INIT("Default");
+        config = &empty_config;
+        has_custom = false;
     }
 
     // Convert to flash format for consistent serialization
@@ -1505,10 +1506,10 @@ static void cmd_pad_config_get(const char* json)
     // USB host
     pos += snprintf(response_buf + pos, sizeof(response_buf) - pos,
                     ",\"usb_host_dp\":%d"
-                    ",\"joywing\":[[%d,%d,%d],[%d,%d,%d]]",
+                    ",\"joywing\":[[%d,%d,%d,%d],[%d,%d,%d,%d]]",
                     flash_data.usb_host_dp,
-                    flash_data.joywing[0].i2c_bus, flash_data.joywing[0].sda, flash_data.joywing[0].scl,
-                    flash_data.joywing[1].i2c_bus, flash_data.joywing[1].sda, flash_data.joywing[1].scl);
+                    flash_data.joywing[0].i2c_bus, flash_data.joywing[0].sda, flash_data.joywing[0].scl, flash_data.joywing[0].addr,
+                    flash_data.joywing[1].i2c_bus, flash_data.joywing[1].sda, flash_data.joywing[1].scl, flash_data.joywing[1].addr);
 
     pos += snprintf(response_buf + pos, sizeof(response_buf) - pos, "}");
 
@@ -1625,14 +1626,15 @@ static void cmd_pad_config_set(const char* json)
     config.usb_host_dp = PAD_PIN_DISABLED;
     if (json_get_int(json, "usb_host_dp", &ival)) config.usb_host_dp = (int8_t)ival;
 
-    // JoyWing (array of [bus,sda,scl] pairs)
+    // JoyWing (array of [bus,sda,scl,addr])
     for (int i = 0; i < 2; i++) {
-        config.joywing[i].i2c_bus = PAD_PIN_DISABLED;
+        config.joywing[i].i2c_bus = 0;
         config.joywing[i].sda = PAD_PIN_DISABLED;
         config.joywing[i].scl = PAD_PIN_DISABLED;
+        config.joywing[i].addr = 0x49;
     }
     {
-        char key[16];
+        char key[20];
         for (int i = 0; i < 2; i++) {
             snprintf(key, sizeof(key), "joywing%d_bus", i);
             if (json_get_int(json, key, &ival)) config.joywing[i].i2c_bus = (int8_t)ival;
@@ -1640,6 +1642,8 @@ static void cmd_pad_config_set(const char* json)
             if (json_get_int(json, key, &ival)) config.joywing[i].sda = (int8_t)ival;
             snprintf(key, sizeof(key), "joywing%d_scl", i);
             if (json_get_int(json, key, &ival)) config.joywing[i].scl = (int8_t)ival;
+            snprintf(key, sizeof(key), "joywing%d_addr", i);
+            if (json_get_int(json, key, &ival)) config.joywing[i].addr = (uint8_t)ival;
         }
     }
 

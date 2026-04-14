@@ -157,8 +157,8 @@ static const pad_device_config_t pad_config_macropad = {
     0
     .usb_host_dp = PAD_PIN_DISABLED,
     .joywing = { 
-        { PAD_PIN_DISABLED, PAD_PIN_DISABLED, PAD_PIN_DISABLED }, 
-        { PAD_PIN_DISABLED, PAD_PIN_DISABLED, PAD_PIN_DISABLED }, 
+        { .i2c_bus = 0, .sda = PAD_PIN_DISABLED, .scl = PAD_PIN_DISABLED, .addr = 0x49 }, 
+        { .i2c_bus = 0, .sda = PAD_PIN_DISABLED, .scl = PAD_PIN_DISABLED, .addr = 0x49 }, 
     },
 };
 

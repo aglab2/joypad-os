@@ -225,15 +225,16 @@ void app_init(void)
 #ifdef SENSOR_PAD
         if (pad_cfg) {
             for (int i = 0; i < 2; i++) {
-                if (pad_cfg->joywing[i].i2c_bus >= 0) {
+                if (pad_cfg->joywing[i].sda >= 0) {
                     joywing_config_t jw_cfg = {
                         .i2c_bus = pad_cfg->joywing[i].i2c_bus,
                         .sda_pin = pad_cfg->joywing[i].sda,
                         .scl_pin = pad_cfg->joywing[i].scl,
+                        .addr = pad_cfg->joywing[i].addr,
                     };
                     joywing_input_init_config(&jw_cfg);
-                    printf("[app:controller_btusb] JoyWing %d configured (bus=%d, SDA=%d, SCL=%d)\n",
-                           i, jw_cfg.i2c_bus, jw_cfg.sda_pin, jw_cfg.scl_pin);
+                    printf("[app:controller_btusb] JoyWing %d (bus=%d, SDA=%d, SCL=%d, addr=0x%02X)\n",
+                           i, jw_cfg.i2c_bus, jw_cfg.sda_pin, jw_cfg.scl_pin, pad_cfg->joywing[i].addr);
                     jw_configured = true;
                 }
             }

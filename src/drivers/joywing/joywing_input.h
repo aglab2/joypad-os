@@ -14,6 +14,7 @@ typedef struct {
     uint8_t i2c_bus;    // I2C bus index (0 or 1)
     uint8_t sda_pin;    // SDA GPIO pin
     uint8_t scl_pin;    // SCL GPIO pin
+    uint8_t addr;       // I2C address (default 0x49)
 } joywing_config_t;
 
 // Set configuration before init (call from app_init)

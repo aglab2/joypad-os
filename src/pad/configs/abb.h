@@ -118,8 +118,8 @@ static const pad_device_config_t pad_config_abb = {
 
     // JoyWing on I2C0 (GP4=SDA, GP5=SCL)
     .joywing = {
-        { .i2c_bus = 0, .sda = 4, .scl = 5 },
-        { .i2c_bus = PAD_PIN_DISABLED, .sda = PAD_PIN_DISABLED, .scl = PAD_PIN_DISABLED },
+        { .i2c_bus = 0, .sda = 4, .scl = 5, .addr = 0x49 },
+        { .i2c_bus = 0, .sda = PAD_PIN_DISABLED, .scl = PAD_PIN_DISABLED, .addr = 0x49 },
     },
 };
 

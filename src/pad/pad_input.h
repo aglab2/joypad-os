@@ -139,11 +139,12 @@ typedef struct {
     // USB host PIO-USB (PAD_PIN_DISABLED = no USB host)
     int8_t usb_host_dp;         // PIO-USB D+ pin (D- is always D+1)
 
-    // JoyWing seesaw I2C (up to 2, PAD_PIN_DISABLED bus = disabled)
+    // JoyWing seesaw I2C (up to 2, PAD_PIN_DISABLED sda = disabled)
     struct {
-        int8_t i2c_bus;         // I2C bus (0 or 1, -1 = disabled)
-        int8_t sda;             // SDA pin
+        int8_t i2c_bus;         // I2C bus (0 or 1)
+        int8_t sda;             // SDA pin (-1 = disabled)
         int8_t scl;             // SCL pin
+        uint8_t addr;           // I2C address (default 0x49)
     } joywing[2];
 } pad_device_config_t;
 
@@ -218,8 +219,8 @@ extern const InputInterface pad_input_interface;
     .qwiic_i2c_inst = PAD_PIN_DISABLED, \
     .usb_host_dp = PAD_PIN_DISABLED, \
     .joywing = { \
-        { PAD_PIN_DISABLED, PAD_PIN_DISABLED, PAD_PIN_DISABLED }, \
-        { PAD_PIN_DISABLED, PAD_PIN_DISABLED, PAD_PIN_DISABLED }, \
+        { .i2c_bus = 0, .sda = PAD_PIN_DISABLED, .scl = PAD_PIN_DISABLED, .addr = 0x49 }, \
+        { .i2c_bus = 0, .sda = PAD_PIN_DISABLED, .scl = PAD_PIN_DISABLED, .addr = 0x49 }, \
     }, \
 }
 

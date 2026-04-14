@@ -104,11 +104,15 @@ export class PadConfigCard {
                             </div>
                             <div class="pad-form-row">
                                 <span class="label">SDA Pin</span>
-                                <input type="number" id="padJoywing${i}Sda" min="0" max="29" value="4">
+                                <input type="number" id="padJoywing${i}Sda" min="0" max="48" value="4">
                             </div>
                             <div class="pad-form-row">
                                 <span class="label">SCL Pin</span>
-                                <input type="number" id="padJoywing${i}Scl" min="0" max="29" value="5">
+                                <input type="number" id="padJoywing${i}Scl" min="0" max="48" value="5">
+                            </div>
+                            <div class="pad-form-row">
+                                <span class="label">Address</span>
+                                <input type="text" id="padJoywing${i}Addr" value="0x49" style="width: 60px;">
                             </div>
                         </div>
                     </div>`).join('')}
@@ -267,16 +271,18 @@ export class PadConfigCard {
             this.el.querySelector('#padSpeakerEnablePin').value = config.speaker_enable_pin !== undefined ? config.speaker_enable_pin : -1;
 
             // JoyWing (array of [bus, sda, scl])
+            // JoyWing: array of [bus, sda, scl, addr]
             const jw = config.joywing || [];
             for (let i = 0; i < 2; i++) {
-                const slot = jw[i] || [-1, -1, -1];
-                const enabled = slot[0] >= 0;
+                const slot = jw[i] || [0, -1, -1, 0x49];
+                const enabled = slot[1] >= 0;  // sda is index 1
                 this.el.querySelector(`#padJoywing${i}Enabled`).checked = enabled;
                 this.el.querySelector(`#padJoywing${i}Pins`).style.display = enabled ? '' : 'none';
                 if (enabled) {
                     this.el.querySelector(`#padJoywing${i}Bus`).value = slot[0];
                     this.el.querySelector(`#padJoywing${i}Sda`).value = slot[1];
                     this.el.querySelector(`#padJoywing${i}Scl`).value = slot[2];
+                    this.el.querySelector(`#padJoywing${i}Addr`).value = '0x' + (slot[3] || 0x49).toString(16);
                 }
             }
 
@@ -376,9 +382,10 @@ export class PadConfigCard {
                 const jw = {};
                 for (let i = 0; i < 2; i++) {
                     const enabled = this.el.querySelector(`#padJoywing${i}Enabled`).checked;
-                    jw[`joywing${i}_bus`] = enabled ? parseInt(this.el.querySelector(`#padJoywing${i}Bus`).value) : -1;
+                    jw[`joywing${i}_bus`] = enabled ? parseInt(this.el.querySelector(`#padJoywing${i}Bus`).value) : 0;
                     jw[`joywing${i}_sda`] = enabled ? parseInt(this.el.querySelector(`#padJoywing${i}Sda`).value) : -1;
                     jw[`joywing${i}_scl`] = enabled ? parseInt(this.el.querySelector(`#padJoywing${i}Scl`).value) : -1;
+                    jw[`joywing${i}_addr`] = enabled ? parseInt(this.el.querySelector(`#padJoywing${i}Addr`).value) : 0x49;
                 }
                 return jw;
             })(),
