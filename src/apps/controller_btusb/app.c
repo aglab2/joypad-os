@@ -219,14 +219,27 @@ void app_init(void)
 
     // Configure sensor inputs
 #ifdef SENSOR_JOYWING
-    joywing_config_t jw_cfg = {
-        .i2c_bus = JOYWING_I2C_BUS,
-        .sda_pin = JOYWING_SDA_PIN,
-        .scl_pin = JOYWING_SCL_PIN,
-    };
-    joywing_input_init_config(&jw_cfg);
-    printf("[app:controller_btusb] JoyWing sensor configured (bus=%d, SDA=%d, SCL=%d)\n",
-           JOYWING_I2C_BUS, JOYWING_SDA_PIN, JOYWING_SCL_PIN);
+    {
+        // Use runtime config if available, else compile-time defaults
+        int8_t jw_bus = JOYWING_I2C_BUS;
+        int8_t jw_sda = JOYWING_SDA_PIN;
+        int8_t jw_scl = JOYWING_SCL_PIN;
+#ifdef SENSOR_PAD
+        if (pad_cfg && pad_cfg->joywing_i2c_bus >= 0) {
+            jw_bus = pad_cfg->joywing_i2c_bus;
+            jw_sda = pad_cfg->joywing_sda;
+            jw_scl = pad_cfg->joywing_scl;
+        }
+#endif
+        joywing_config_t jw_cfg = {
+            .i2c_bus = jw_bus,
+            .sda_pin = jw_sda,
+            .scl_pin = jw_scl,
+        };
+        joywing_input_init_config(&jw_cfg);
+        printf("[app:controller_btusb] JoyWing configured (bus=%d, SDA=%d, SCL=%d)\n",
+               jw_bus, jw_sda, jw_scl);
+    }
 #endif
 
     // Configure router: merge all sensor inputs to outputs

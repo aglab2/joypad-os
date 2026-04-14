@@ -14,7 +14,6 @@ export class AdvancedCard {
                     <div class="danger-zone">
                         <h3>Danger Zone</h3>
                         <div class="buttons">
-                            <button class="secondary" id="clearBtBtn">Clear BT Bonds</button>
                             <button class="secondary" id="resetBtn">Factory Reset</button>
                             <button class="secondary" id="rebootBtn">Reboot</button>
                             <button class="secondary" id="bootselBtn">Bootloader</button>
@@ -23,20 +22,9 @@ export class AdvancedCard {
                 </div>
             </div>`;
 
-        this.el.querySelector('#clearBtBtn').addEventListener('click', () => this.clearBtBonds());
         this.el.querySelector('#resetBtn').addEventListener('click', () => this.factoryReset());
         this.el.querySelector('#rebootBtn').addEventListener('click', () => this.reboot());
         this.el.querySelector('#bootselBtn').addEventListener('click', () => this.bootsel());
-    }
-
-    async clearBtBonds() {
-        if (!confirm('Clear all Bluetooth bonds? Devices will need to re-pair.')) return;
-        try {
-            await this.protocol.clearBtBonds();
-            this.log('Bluetooth bonds cleared', 'success');
-        } catch (e) {
-            this.log(`Failed to clear bonds: ${e.message}`, 'error');
-        }
     }
 
     async factoryReset() {

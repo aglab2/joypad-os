@@ -115,6 +115,11 @@ static const pad_device_config_t pad_config_abb = {
     // USB host via PIO-USB on GPIO 23 (D+) / GPIO 24 (D-)
     // Passthrough variant: USB-A port, SMD slider in USB position
     .usb_host_dp = 23,
+
+    // JoyWing on I2C0 (GP4=SDA, GP5=SCL)
+    .joywing_i2c_bus = 0,
+    .joywing_sda = 4,
+    .joywing_scl = 5,
 };
 
 #endif // PAD_CONFIG_ABB_H

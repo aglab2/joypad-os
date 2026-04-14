@@ -1,4 +1,4 @@
-/** GPIO Pin Configuration Card */
+/** Buttons & Pins Configuration — Tabbed Sub-Sections */
 
 const PAD_BUTTON_NAMES = [
     'D-Up', 'D-Down', 'D-Left', 'D-Right',
@@ -33,12 +33,15 @@ export class PadConfigCard {
     render() {
         this.el.innerHTML = `
             <div class="card" id="padConfigCard" style="display:none;">
-                <h2>GPIO Pin Configuration</h2>
-                <div class="card-content">
-                    <div class="pad-form-row">
-                        <span class="label">Config Name</span>
-                        <input type="text" id="padConfigName" maxlength="31" placeholder="Custom">
-                    </div>
+                <h2>Custom Gamepad</h2>
+                <div class="sub-tabs">
+                    <button class="sub-tab active" data-tab="buttons">Buttons</button>
+                    <button class="sub-tab" data-tab="analog">Analog</button>
+                    <button class="sub-tab" data-tab="hardware">Hardware</button>
+                </div>
+
+                <!-- Buttons Tab -->
+                <div class="sub-tab-content active" id="tabButtons" data-tab="buttons">
                     <div class="pad-form-row">
                         <span class="label">Active Level</span>
                         <select id="padActiveHigh">
@@ -47,35 +50,67 @@ export class PadConfigCard {
                         </select>
                     </div>
 
-                    <h3 style="margin-top: 15px; margin-bottom: 10px;">Button Pin Assignments</h3>
+                    <h3 style="margin-top: 12px; margin-bottom: 8px;">Pin Assignments</h3>
                     <div id="padButtonPins" class="pad-pin-grid two-col"></div>
 
-                    <h3 style="margin-top: 15px; margin-bottom: 10px;">D-pad Toggle Switch</h3>
+                    <h3 style="margin-top: 12px; margin-bottom: 8px;">D-pad Toggle</h3>
                     <div class="pad-form-row">
                         <span class="label">Toggle Pin</span>
                         <input type="number" id="padDpadToggle" min="-1" max="29" value="-1">
                     </div>
                     <div class="checkbox-row">
                         <input type="checkbox" id="padDpadToggleInvert">
-                        <label for="padDpadToggleInvert">Invert toggle (HIGH = D-pad mode)</label>
+                        <label for="padDpadToggleInvert">Invert (HIGH = D-pad mode)</label>
                     </div>
+                </div>
 
-                    <h3 style="margin-top: 15px; margin-bottom: 10px;">Analog Sticks (ADC)</h3>
+                <!-- Analog Tab -->
+                <div class="sub-tab-content" id="tabAnalog" data-tab="analog">
+                    <h3 style="margin-bottom: 8px;">Stick Assignments (ADC)</h3>
                     <div class="pad-pin-grid">
                         ${adcRow('Left X', 'padAdcLX')}
                         ${adcRow('Left Y', 'padAdcLY')}
                         ${adcRow('Right X', 'padAdcRX')}
                         ${adcRow('Right Y', 'padAdcRY')}
                     </div>
-                    <div class="pad-form-row" style="margin-top: 10px;">
+                    <div class="pad-form-row" style="margin-top: 12px;">
                         <span class="label">Deadzone</span>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <input type="range" id="padDeadzone" min="0" max="127" value="10" style="width: 120px;">
                             <span id="padDeadzoneValue">10</span>
                         </div>
                     </div>
+                </div>
 
-                    <h3 style="margin-top: 15px; margin-bottom: 10px;">I2C Expander</h3>
+                <!-- Hardware Tab -->
+                <div class="sub-tab-content" id="tabHardware" data-tab="hardware">
+                    <h3 style="margin-bottom: 8px;">JoyWing (Seesaw I2C)</h3>
+                    <div class="toggle-row" style="margin-bottom: 8px;">
+                        <label class="toggle">
+                            <input type="checkbox" id="padJoywingEnabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Enable JoyWing</span>
+                    </div>
+                    <div id="padJoywingPins" style="display:none;">
+                        <div class="pad-form-row">
+                            <span class="label">I2C Bus</span>
+                            <select id="padJoywingBus">
+                                <option value="0">I2C0</option>
+                                <option value="1">I2C1</option>
+                            </select>
+                        </div>
+                        <div class="pad-form-row">
+                            <span class="label">SDA Pin</span>
+                            <input type="number" id="padJoywingSda" min="0" max="29" value="4">
+                        </div>
+                        <div class="pad-form-row">
+                            <span class="label">SCL Pin</span>
+                            <input type="number" id="padJoywingScl" min="0" max="29" value="5">
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 12px; margin-bottom: 8px;">I2C Expander</h3>
                     <div class="pad-form-row">
                         <span class="label">SDA Pin</span>
                         <input type="number" id="padI2cSda" min="-1" max="29" value="-1">
@@ -85,7 +120,7 @@ export class PadConfigCard {
                         <input type="number" id="padI2cScl" min="-1" max="29" value="-1">
                     </div>
 
-                    <h3 style="margin-top: 15px; margin-bottom: 10px;">NeoPixel LEDs</h3>
+                    <h3 style="margin-top: 12px; margin-bottom: 8px;">NeoPixel LEDs</h3>
                     <div class="pad-form-row">
                         <span class="label">LED Pin</span>
                         <input type="number" id="padLedPin" min="-1" max="29" value="-1">
@@ -95,7 +130,7 @@ export class PadConfigCard {
                         <input type="number" id="padLedCount" min="0" max="16" value="0">
                     </div>
 
-                    <h3 style="margin-top: 15px; margin-bottom: 10px;">Speaker</h3>
+                    <h3 style="margin-top: 12px; margin-bottom: 8px;">Speaker</h3>
                     <div class="pad-form-row">
                         <span class="label">Speaker Pin</span>
                         <input type="number" id="padSpeakerPin" min="-1" max="29" value="-1">
@@ -104,24 +139,31 @@ export class PadConfigCard {
                         <span class="label">Enable Pin</span>
                         <input type="number" id="padSpeakerEnablePin" min="-1" max="29" value="-1">
                     </div>
-
-                    <h3 style="margin-top: 15px; margin-bottom: 10px;">USB Host (PIO-USB)</h3>
-                    <div class="pad-form-row">
-                        <span class="label">D+ Pin</span>
-                        <input type="number" id="padUsbHostDp" min="-1" max="28" value="-1">
-                    </div>
-                    <p class="hint">D- is always D+1. Set to -1 to disable USB host. Requires reboot.</p>
-
-                    <div id="padPinConflicts" class="pad-conflicts" style="display:none;"></div>
-
-                    <div class="buttons" style="margin-top: 15px;">
-                        <button id="padSaveBtn">Save &amp; Reboot</button>
-                        <button id="padResetBtn" class="secondary">Reset to Default</button>
-                    </div>
-                    <p class="hint" style="margin-top: 8px;">Saving will reboot the device to apply the new pin configuration.</p>
                 </div>
+
+                <div id="padPinConflicts" class="pad-conflicts" style="display:none;"></div>
+
+                <div class="buttons" style="margin-top: 16px;">
+                    <button id="padSaveBtn">Save &amp; Reboot</button>
+                    <button id="padResetBtn" class="secondary">Reset to Default</button>
+                </div>
+                <p class="hint" style="margin-top: 8px;">Saving will reboot the device to apply changes.</p>
             </div>`;
 
+        // Sub-tab switching
+        this.el.querySelectorAll('.sub-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                this.el.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+                this.el.querySelectorAll('.sub-tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                this.el.querySelector(`.sub-tab-content[data-tab="${tab.dataset.tab}"]`).classList.add('active');
+            });
+        });
+
+        this.el.querySelector('#padJoywingEnabled').addEventListener('change', () => {
+            this.el.querySelector('#padJoywingPins').style.display =
+                this.el.querySelector('#padJoywingEnabled').checked ? '' : 'none';
+        });
         this.el.querySelector('#padSaveBtn').addEventListener('click', () => this.save());
         this.el.querySelector('#padResetBtn').addEventListener('click', () => this.reset());
         this.el.querySelector('#padDeadzone').addEventListener('input', (e) => {
@@ -151,7 +193,6 @@ export class PadConfigCard {
         const includeI2C = this.hasI2C();
         const container = this.el.querySelector('#padButtonPins');
         if (!container) return;
-        // Preserve current values
         const values = [];
         for (let i = 0; i < PAD_BUTTON_NAMES.length; i++) {
             const sel = this.el.querySelector('#padBtn' + i);
@@ -176,14 +217,12 @@ export class PadConfigCard {
 
             card.style.display = '';
 
-            this.el.querySelector('#padConfigName').value = config.name || '';
             this.el.querySelector('#padActiveHigh').value = String(config.active_high || false);
 
             // I2C (set before button pins so buildPinSelect can check hasI2C)
             this.el.querySelector('#padI2cSda').value = config.i2c_sda !== undefined ? config.i2c_sda : -1;
             this.el.querySelector('#padI2cScl').value = config.i2c_scl !== undefined ? config.i2c_scl : -1;
 
-            // Rebuild pin selects when I2C config changes
             this.el.querySelector('#padI2cSda').addEventListener('change', () => this.rebuildPinSelects());
             this.el.querySelector('#padI2cScl').addEventListener('change', () => this.rebuildPinSelects());
 
@@ -222,8 +261,15 @@ export class PadConfigCard {
             this.el.querySelector('#padSpeakerPin').value = config.speaker_pin !== undefined ? config.speaker_pin : -1;
             this.el.querySelector('#padSpeakerEnablePin').value = config.speaker_enable_pin !== undefined ? config.speaker_enable_pin : -1;
 
-            // USB host
-            this.el.querySelector('#padUsbHostDp').value = config.usb_host_dp !== undefined ? config.usb_host_dp : -1;
+            // JoyWing
+            const jwEnabled = config.joywing_bus !== undefined && config.joywing_bus >= 0;
+            this.el.querySelector('#padJoywingEnabled').checked = jwEnabled;
+            this.el.querySelector('#padJoywingPins').style.display = jwEnabled ? '' : 'none';
+            if (jwEnabled) {
+                this.el.querySelector('#padJoywingBus').value = config.joywing_bus;
+                this.el.querySelector('#padJoywingSda').value = config.joywing_sda;
+                this.el.querySelector('#padJoywingScl').value = config.joywing_scl;
+            }
 
             // Conflict detection
             container.addEventListener('change', () => this.checkConflicts());
@@ -286,7 +332,7 @@ export class PadConfigCard {
         if (conflictEl.style.display !== 'none') {
             if (!confirm('There are pin conflicts. Save anyway?')) return;
         }
-        if (!confirm('Save GPIO configuration? The device will reboot.')) return;
+        if (!confirm('Save configuration? The device will reboot.')) return;
 
         const buttons = [];
         for (let i = 0; i < 22; i++) {
@@ -295,7 +341,7 @@ export class PadConfigCard {
         }
 
         const config = {
-            name: this.el.querySelector('#padConfigName').value || 'Custom',
+            name: 'Custom',
             active_high: this.el.querySelector('#padActiveHigh').value === 'true',
             dpad_toggle_invert: this.el.querySelector('#padDpadToggleInvert').checked,
             invert_lx: this.el.querySelector('#padAdcLXInvert').checked,
@@ -317,11 +363,16 @@ export class PadConfigCard {
             led_count: parseInt(this.el.querySelector('#padLedCount').value),
             speaker_pin: parseInt(this.el.querySelector('#padSpeakerPin').value),
             speaker_enable_pin: parseInt(this.el.querySelector('#padSpeakerEnablePin').value),
-            usb_host_dp: parseInt(this.el.querySelector('#padUsbHostDp').value),
+            joywing_bus: this.el.querySelector('#padJoywingEnabled').checked
+                ? parseInt(this.el.querySelector('#padJoywingBus').value) : -1,
+            joywing_sda: this.el.querySelector('#padJoywingEnabled').checked
+                ? parseInt(this.el.querySelector('#padJoywingSda').value) : -1,
+            joywing_scl: this.el.querySelector('#padJoywingEnabled').checked
+                ? parseInt(this.el.querySelector('#padJoywingScl').value) : -1,
         };
 
         try {
-            this.log('Saving pad GPIO config...');
+            this.log('Saving pad config...');
             const result = await this.protocol.setPadConfig(config);
             this.log(result.reboot ? 'Config saved. Device rebooting...' : 'Config saved.', 'success');
         } catch (e) {
@@ -330,7 +381,7 @@ export class PadConfigCard {
     }
 
     async reset() {
-        if (!confirm('Reset GPIO configuration to compile-time default? The device will reboot.')) return;
+        if (!confirm('Reset to compile-time default? The device will reboot.')) return;
         try {
             this.log('Resetting pad config...');
             await this.protocol.resetPadConfig();

@@ -1,10 +1,11 @@
 import { CDCProtocol, WebSerialTransport, WebBluetoothTransport } from './cdc-protocol.js';
 import { DeviceInfoCard } from './components/device-info.js';
-import { ModeSelectCard } from './components/mode-select.js';
+import { UsbOutputCard } from './components/usb-output.js';
+import { BtOutputCard } from './components/bt-output.js';
 import { PadConfigCard } from './components/pad-config.js';
 import { ProfilesCard, BUTTON_NAMES, BUTTON_LABELS, REMAPPABLE_COUNT } from './components/profiles.js';
 import { InputTestCard } from './components/input-test.js';
-import { WiimoteCard } from './components/wiimote.js';
+import { UsbHostCard } from './components/usb-host.js';
 import { AdvancedCard } from './components/advanced.js';
 
 /**
@@ -15,10 +16,11 @@ import { AdvancedCard } from './components/advanced.js';
 // Page registry: maps page IDs to sidebar groups
 const PAGE_GROUPS = {
     'device-info': 'device',
-    'modes':       'output',
+    'usb':         'output',
+    'bluetooth':   'output',
     'profiles':    'output',
     'gpio':        'input',
-    'wiimote':     'input',
+    'usb-host':    'input',
     'input-test':  'debug',
     'log':         'debug',
     'advanced':    'system',
@@ -27,8 +29,8 @@ const PAGE_GROUPS = {
 // First page in each group (for mobile tab navigation)
 const GROUP_FIRST_PAGE = {
     'device':   'device-info',
-    'output':   'modes',
-    'input': 'gpio',
+    'output':   'usb',
+    'input':    'gpio',
     'debug':    'input-test',
     'system':   'advanced',
 };
@@ -51,20 +53,22 @@ class JoypadConfigApp {
         // Initialize components
         const log = (msg, type) => this.log(msg, type);
         this.deviceInfo = new DeviceInfoCard(document.getElementById('headerInfo'), document.getElementById('cardDeviceInfo'), this.protocol, log);
-        this.modeSelect = new ModeSelectCard(document.getElementById('cardModeSelect'), this.protocol, log);
+        this.usbOutput = new UsbOutputCard(document.getElementById('cardUsbOutput'), this.protocol, log);
+        this.btOutput = new BtOutputCard(document.getElementById('cardBtOutput'), this.protocol, log);
         this.padConfig = new PadConfigCard(document.getElementById('cardPadConfig'), this.protocol, log);
+        this.usbHost = new UsbHostCard(document.getElementById('cardUsbHost'), this.protocol, log);
         this.profiles = new ProfilesCard(document.getElementById('cardProfiles'), this.protocol, log);
         this.inputTest = new InputTestCard(document.getElementById('cardInputTest'), this.protocol, log);
-        this.wiimote = new WiimoteCard(document.getElementById('cardWiimote'), this.protocol, log);
         this.advanced = new AdvancedCard(document.getElementById('cardAdvanced'), this.protocol, log);
 
         // Render component HTML
         this.deviceInfo.render();
-        this.modeSelect.render();
+        this.usbOutput.render();
+        this.btOutput.render();
         this.padConfig.render();
+        this.usbHost.render();
         this.profiles.render();
         this.inputTest.render();
-        this.wiimote.render();
         this.advanced.render();
 
         // Connection events
@@ -162,6 +166,11 @@ class JoypadConfigApp {
 
         this.currentPage = pageId;
 
+        // Auto-start streaming when visiting input-test
+        if (pageId === 'input-test' && !this.inputTest.streaming && this.protocol.connected) {
+            this.inputTest.toggleStreaming();
+        }
+
         // Persist in URL hash for reload
         history.replaceState(null, '', '#' + pageId);
     }
@@ -182,15 +191,33 @@ class JoypadConfigApp {
     }
 
     updateNavVisibility() {
-        // Hide GPIO nav link if device doesn't support pad config
+        // Hide Controller nav link if device doesn't support pad config
         const gpioLink = document.getElementById('navGpio');
         if (gpioLink) {
             gpioLink.style.display = this.hasPadConfig ? '' : 'none';
         }
 
+        // Hide USB Host nav link if device doesn't support it
+        const usbHostLink = document.getElementById('navUsbHost');
+        if (usbHostLink) {
+            usbHostLink.style.display = this.usbHost.isAvailable() ? '' : 'none';
+        }
+
+        // Hide Bluetooth nav link if device has no BT features
+        const btLink = document.getElementById('navBluetooth');
+        if (btLink) {
+            btLink.style.display = this.btOutput.isAvailable() ? '' : 'none';
+        }
+
         // If current page is hidden, navigate to first available
         if (this.currentPage === 'gpio' && !this.hasPadConfig) {
-            this.navigateTo('wiimote');
+            this.navigateTo('usb');
+        }
+        if (this.currentPage === 'usb-host' && !this.usbHost.isAvailable()) {
+            this.navigateTo('usb');
+        }
+        if (this.currentPage === 'bluetooth' && !this.btOutput.isAvailable()) {
+            this.navigateTo('usb');
         }
     }
 
@@ -274,14 +301,15 @@ class JoypadConfigApp {
 
     async loadAll() {
         await this.deviceInfo.load();
-        await this.modeSelect.load();
+        await this.usbOutput.load();
+        await this.btOutput.load();
         await this.padConfig.load();
+        await this.usbHost.load();
         // Check if pad config card is visible to determine nav visibility
         const padCard = document.querySelector('#cardPadConfig .card, #cardPadConfig #padConfigCard');
         this.hasPadConfig = padCard && padCard.style.display !== 'none';
         this.updateNavVisibility();
         await this.profiles.load();
-        await this.wiimote.load();
         // Navigate to default page
         this.navigateTo(this.getInitialPage());
     }

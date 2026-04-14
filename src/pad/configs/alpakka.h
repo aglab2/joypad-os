@@ -91,6 +91,9 @@ static const pad_device_config_t pad_config_alpakka = {
     .qwiic_rx = PAD_PIN_DISABLED,
     .qwiic_i2c_inst = PAD_PIN_DISABLED,
     .usb_host_dp = PAD_PIN_DISABLED,
+    .joywing_i2c_bus = PAD_PIN_DISABLED,
+    .joywing_sda = PAD_PIN_DISABLED,
+    .joywing_scl = PAD_PIN_DISABLED,
 };
 
 #endif // PAD_CONFIG_ALPAKKA_H

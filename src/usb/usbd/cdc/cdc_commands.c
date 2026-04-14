@@ -1504,7 +1504,10 @@ static void cmd_pad_config_get(const char* json)
 
     // USB host
     pos += snprintf(response_buf + pos, sizeof(response_buf) - pos,
-                    ",\"usb_host_dp\":%d", flash_data.usb_host_dp);
+                    ",\"usb_host_dp\":%d"
+                    ",\"joywing_bus\":%d,\"joywing_sda\":%d,\"joywing_scl\":%d",
+                    flash_data.usb_host_dp,
+                    flash_data.joywing_i2c_bus, flash_data.joywing_sda, flash_data.joywing_scl);
 
     pos += snprintf(response_buf + pos, sizeof(response_buf) - pos, "}");
 
@@ -1620,6 +1623,14 @@ static void cmd_pad_config_set(const char* json)
     // USB host
     config.usb_host_dp = PAD_PIN_DISABLED;
     if (json_get_int(json, "usb_host_dp", &ival)) config.usb_host_dp = (int8_t)ival;
+
+    // JoyWing
+    config.joywing_i2c_bus = PAD_PIN_DISABLED;
+    config.joywing_sda = PAD_PIN_DISABLED;
+    config.joywing_scl = PAD_PIN_DISABLED;
+    if (json_get_int(json, "joywing_bus", &ival)) config.joywing_i2c_bus = (int8_t)ival;
+    if (json_get_int(json, "joywing_sda", &ival)) config.joywing_sda = (int8_t)ival;
+    if (json_get_int(json, "joywing_scl", &ival)) config.joywing_scl = (int8_t)ival;
 
     // Save to flash
     pad_config_save(&config);
@@ -1926,28 +1937,16 @@ void cdc_commands_send_player_input(uint8_t player, uint8_t dev_addr,
     bool changed = (buttons != th->buttons || memcmp(axes, th->axes, 7) != 0);
     if (!changed && (now - th->last_ms) < 16) return;
 
-    bool first = (th->buttons == 0xFFFFFFFF);  // First event for this device
     th->buttons = buttons;
     memcpy(th->axes, axes, 7);
     th->last_ms = now;
 
-    if (first) {
-        // First event: include name and source for UI to cache
-        snprintf(response_buf, sizeof(response_buf),
-                 "{\"type\":\"input\",\"player\":%d,\"addr\":%d,\"name\":\"%.31s\",\"src\":\"%.8s\","
-                 "\"buttons\":%lu,\"axes\":[%d,%d,%d,%d,%d,%d,%d]}",
-                 player, dev_addr, name ? name : "", source ? source : "",
-                 (unsigned long)buttons,
-                 axes[0], axes[1], axes[2], axes[3], axes[4], axes[5], axes[6]);
-    } else {
-        // Subsequent events: compact format (no name/src)
-        snprintf(response_buf, sizeof(response_buf),
-                 "{\"type\":\"input\",\"player\":%d,\"addr\":%d,"
-                 "\"buttons\":%lu,\"axes\":[%d,%d,%d,%d,%d,%d,%d]}",
-                 player, dev_addr,
-                 (unsigned long)buttons,
-                 axes[0], axes[1], axes[2], axes[3], axes[4], axes[5], axes[6]);
-    }
+    snprintf(response_buf, sizeof(response_buf),
+             "{\"type\":\"input\",\"player\":%d,\"addr\":%d,\"name\":\"%.31s\",\"src\":\"%.8s\","
+             "\"buttons\":%lu,\"axes\":[%d,%d,%d,%d,%d,%d,%d]}",
+             player, dev_addr, name ? name : "", source ? source : "",
+             (unsigned long)buttons,
+             axes[0], axes[1], axes[2], axes[3], axes[4], axes[5], axes[6]);
     cdc_protocol_send_event(stream_ctx, response_buf);
 }
 

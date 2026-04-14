@@ -68,7 +68,7 @@ export class InputTestCard {
             const player = event.player !== undefined ? event.player : 0;
             const addr = event.addr !== undefined ? event.addr : 0;
             this.ensurePlayerGroup(player);
-            this.ensureInputSource(player, addr, event.name || 'Unknown', event.src || '');
+            this.ensureInputSource(player, addr, event.name || '', event.src || '');
             this.scheduleUpdate(`p${player}a${addr}`, event.buttons, event.axes);
         } else if (event.type === 'output') {
             const player = event.player !== undefined ? event.player : 0;
@@ -125,11 +125,13 @@ export class InputTestCard {
     ensureInputSource(player, addr, name, source) {
         const key = `${player}:${addr}`;
         if (this.players[player].sources[addr]) {
-            // Update name if changed
-            const label = this.el.querySelector(`#srcLabel${player}a${addr}`);
-            if (label) {
-                const text = source ? `${name} (${source})` : name;
-                if (label.textContent !== text) label.textContent = text;
+            // Update name if we have one and it changed
+            if (name) {
+                const label = this.el.querySelector(`#srcLabel${player}a${addr}`);
+                if (label) {
+                    const text = source ? `${name} (${source})` : name;
+                    if (label.textContent !== text) label.textContent = text;
+                }
             }
             return;
         }
