@@ -46,22 +46,28 @@ bool platform_gpio_get(uint8_t pin) {
 }
 
 // ADC — nRF52840 SAADC with AIN0-AIN7
+#ifdef CONFIG_ADC
 static const struct device* adc_dev = NULL;
-static bool adc_inited = false;
+static bool adc_inited_hw = false;
+#endif
 
 void platform_adc_init(void) {
-    if (adc_inited) return;
-
+#ifdef CONFIG_ADC
+    if (adc_inited_hw) return;
     adc_dev = DEVICE_DT_GET(DT_NODELABEL(adc));
     if (!device_is_ready(adc_dev)) {
         printf("[gpio] ADC device not ready\n");
         adc_dev = NULL;
         return;
     }
-    adc_inited = true;
+    adc_inited_hw = true;
+#else
+    printf("[gpio] ADC not available on this board\n");
+#endif
 }
 
 void platform_adc_init_channel(uint8_t channel) {
+#ifdef CONFIG_ADC
     if (!adc_dev || channel > 7) return;
 
     struct adc_channel_cfg cfg = {
@@ -69,12 +75,18 @@ void platform_adc_init_channel(uint8_t channel) {
         .reference = ADC_REF_INTERNAL,
         .acquisition_time = ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10),
         .channel_id = channel,
+#if defined(CONFIG_ADC_NRFX_SAADC)
         .input_positive = SAADC_CH_PSELP_PSELP_AnalogInput0 + channel,
+#endif
     };
     adc_channel_setup(adc_dev, &cfg);
+#else
+    (void)channel;
+#endif
 }
 
 uint16_t platform_adc_read(uint8_t channel) {
+#ifdef CONFIG_ADC
     if (!adc_dev) return 2048;
 
     int16_t sample = 0;
@@ -88,7 +100,10 @@ uint16_t platform_adc_read(uint8_t channel) {
     int err = adc_read(adc_dev, &seq);
     if (err < 0) return 2048;
 
-    // SAADC returns signed value, clamp to 0-4095
     if (sample < 0) sample = 0;
     return (uint16_t)sample;
+#else
+    (void)channel;
+    return 2048;
+#endif
 }
