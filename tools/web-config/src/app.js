@@ -6,6 +6,7 @@ import { PadConfigCard } from './components/pad-config.js';
 import { ProfilesCard, BUTTON_NAMES, BUTTON_LABELS, REMAPPABLE_COUNT } from './components/profiles.js';
 import { InputTestCard } from './components/input-test.js';
 import { UsbHostCard } from './components/usb-host.js';
+import { BtHostCard } from './components/bt-host.js';
 import { AdvancedCard } from './components/advanced.js';
 
 /**
@@ -15,12 +16,13 @@ import { AdvancedCard } from './components/advanced.js';
 
 // Page registry: maps page IDs to sidebar groups
 const PAGE_GROUPS = {
-    'device-info': 'device',
+    'device-info': 'core',
+    'profiles':    'core',
     'usb':         'output',
     'bluetooth':   'output',
-    'profiles':    'output',
     'gpio':        'input',
     'usb-host':    'input',
+    'bt-host':     'input',
     'input-test':  'debug',
     'log':         'debug',
     'advanced':    'system',
@@ -28,7 +30,7 @@ const PAGE_GROUPS = {
 
 // First page in each group (for mobile tab navigation)
 const GROUP_FIRST_PAGE = {
-    'device':   'device-info',
+    'core':     'device-info',
     'output':   'usb',
     'input':    'gpio',
     'debug':    'input-test',
@@ -57,6 +59,7 @@ class JoypadConfigApp {
         this.btOutput = new BtOutputCard(document.getElementById('cardBtOutput'), this.protocol, log);
         this.padConfig = new PadConfigCard(document.getElementById('cardPadConfig'), this.protocol, log);
         this.usbHost = new UsbHostCard(document.getElementById('cardUsbHost'), this.protocol, log);
+        this.btHost = new BtHostCard(document.getElementById('cardBtHost'), this.protocol, log);
         this.profiles = new ProfilesCard(document.getElementById('cardProfiles'), this.protocol, log);
         this.inputTest = new InputTestCard(document.getElementById('cardInputTest'), this.protocol, log);
         this.advanced = new AdvancedCard(document.getElementById('cardAdvanced'), this.protocol, log);
@@ -67,6 +70,7 @@ class JoypadConfigApp {
         this.btOutput.render();
         this.padConfig.render();
         this.usbHost.render();
+        this.btHost.render();
         this.profiles.render();
         this.inputTest.render();
         this.advanced.render();
@@ -203,10 +207,16 @@ class JoypadConfigApp {
             usbHostLink.style.display = this.usbHost.isAvailable() ? '' : 'none';
         }
 
-        // Hide Bluetooth nav link if device has no BT features
+        // Hide Bluetooth output nav link if device has no BLE output
         const btLink = document.getElementById('navBluetooth');
         if (btLink) {
             btLink.style.display = this.btOutput.isAvailable() ? '' : 'none';
+        }
+
+        // Hide Bluetooth host nav link if device has no BT host features
+        const btHostLink = document.getElementById('navBtHost');
+        if (btHostLink) {
+            btHostLink.style.display = this.btHost.isAvailable() ? '' : 'none';
         }
 
         // If current page is hidden, navigate to first available
@@ -305,6 +315,7 @@ class JoypadConfigApp {
         await this.btOutput.load();
         await this.padConfig.load();
         await this.usbHost.load();
+        await this.btHost.load();
         // Check if pad config card is visible to determine nav visibility
         const padCard = document.querySelector('#cardPadConfig .card, #cardPadConfig #padConfigCard');
         this.hasPadConfig = padCard && padCard.style.display !== 'none';
