@@ -381,9 +381,26 @@ elseif(APP_TYPE STREQUAL "controller_btusb")
         "${SHARED_SRC}/bt/ble_output/ble_nus.c"
         "${SHARED_SRC}/bt/ble_output/ble_xbox_gatt_db.c"
 
-        # --- BT transport (peripheral mode — no btstack_host, no bthid) ---
+        # --- BT transport ---
         "${SHARED_SRC}/bt/transport/bt_transport.c"
         "${SHARED_SRC}/bt/transport/bt_transport_nrf.c"
+
+        # --- BT Central (host mode — scan for BLE controllers) ---
+        "${SHARED_SRC}/bt/btstack/btstack_host.c"
+        "${SHARED_SRC}/bt/btstack/bt_device_db.c"
+        "${SHARED_SRC}/bt/bthid/bthid.c"
+        "${SHARED_SRC}/bt/bthid/bthid_registry.c"
+        "${SHARED_SRC}/bt/bthid/devices/generic/bthid_gamepad.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/sony/ds3_bt.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/sony/ds4_bt.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/sony/ds5_bt.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/nintendo/switch_pro_bt.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/nintendo/switch2_ble.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/nintendo/wii_u_pro_bt.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/nintendo/wiimote_bt.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/microsoft/xbox_bt.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/microsoft/xbox_ble.c"
+        "${SHARED_SRC}/bt/bthid/devices/vendors/google/stadia_bt.c"
 
         # --- nRF BTstack TLV ---
         "src/btstack_tlv_nrf.c"
@@ -417,8 +434,11 @@ elseif(APP_TYPE STREQUAL "controller_btusb")
         "${BTSTACK_PATH}/src/ble/le_device_db_memory.c"
         "${BTSTACK_PATH}/src/ble/le_device_db_tlv.c"
 
-        # --- BTstack GATT server (peripheral mode) ---
+        # --- BTstack GATT server (peripheral mode) + GATT client services (central mode) ---
         "${BTSTACK_PATH}/src/ble/att_server.c"
+        "${BTSTACK_PATH}/src/ble/gatt-service/hids_client.c"
+        "${BTSTACK_PATH}/src/ble/gatt-service/battery_service_client.c"
+        "${BTSTACK_PATH}/src/ble/gatt-service/device_information_service_client.c"
         "${BTSTACK_PATH}/src/ble/gatt-service/hids_device.c"
         "${BTSTACK_PATH}/src/ble/gatt-service/battery_service_server.c"
         "${BTSTACK_PATH}/src/ble/gatt-service/device_information_service_server.c"
@@ -471,6 +491,7 @@ elseif(APP_TYPE STREQUAL "controller_btusb")
         BTSTACK_USE_NRF=1
         ENABLE_BTSTACK=1
         REQUIRE_BLE_OUTPUT=1
+        REQUIRE_BT_INPUT=1
         SENSOR_JOYWING=1
         PLATFORM_NRF=1
         DISABLE_DISPLAY_SPI=1
