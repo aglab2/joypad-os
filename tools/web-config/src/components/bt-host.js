@@ -12,7 +12,12 @@ export class BtHostCard {
             <div class="card" id="btHostCard" style="display:none;">
                 <h2>Bluetooth Host</h2>
                 <div class="card-content">
-                    <div class="row">
+                    <div class="pad-form-row">
+                        <span class="label">Enable</span>
+                        <label class="toggle"><input type="checkbox" id="btInputEnable"><span class="toggle-slider"></span></label>
+                        <span class="hint">Scan for BT/BLE controllers</span>
+                    </div>
+                    <div class="pad-form-row">
                         <span class="label">Wiimote Orientation</span>
                         <select id="wiimoteOrientSelect">
                             <option value="0">Auto</option>
@@ -21,6 +26,10 @@ export class BtHostCard {
                         </select>
                     </div>
                     <p class="hint">Controls D-pad mapping when using Wiimote alone (no extension).</p>
+                    <div class="buttons" style="margin-top: 12px;">
+                        <button id="btHostSaveBtn">Save &amp; Reboot</button>
+                    </div>
+                    <p class="hint" style="margin-top: 8px;">Device will reboot to apply changes.</p>
                 </div>
             </div>
             <div class="card" id="btBondsCard" style="display:none;">
@@ -33,7 +42,7 @@ export class BtHostCard {
                 </div>
             </div>`;
 
-        this.el.querySelector('#wiimoteOrientSelect').addEventListener('change', (e) => this.setWiimoteOrient(e.target.value));
+        this.el.querySelector('#btHostSaveBtn').addEventListener('click', () => this.save());
         this.el.querySelector('#clearBtBtn').addEventListener('click', () => this.clearBtBonds());
     }
 
@@ -49,7 +58,12 @@ export class BtHostCard {
             this.el.querySelector('#wiimoteOrientSelect').value = result.mode;
             card.style.display = '';
             this.visible = true;
-            this.log(`Wiimote orientation: ${result.name}`);
+
+            // Load BT input toggle from router settings
+            try {
+                const router = await this.protocol.getRouter();
+                this.el.querySelector('#btInputEnable').checked = router.bt_input || false;
+            } catch (e) {}
         } catch (e) {
             card.style.display = 'none';
         }
@@ -66,13 +80,23 @@ export class BtHostCard {
         }
     }
 
-    async setWiimoteOrient(mode) {
+    async save() {
+        if (!confirm('Save Bluetooth host configuration? The device will reboot.')) return;
         try {
-            this.log(`Setting Wiimote orientation to ${mode}...`);
-            const result = await this.protocol.setWiimoteOrient(parseInt(mode));
-            this.log(`Wiimote orientation set to ${result.name}`, 'success');
+            // Save Wiimote orientation
+            const mode = parseInt(this.el.querySelector('#wiimoteOrientSelect').value);
+            await this.protocol.setWiimoteOrient(mode);
+
+            // Save BT input toggle via router settings
+            const router = await this.protocol.getRouter();
+            await this.protocol.setRouter({
+                routing_mode: router.routing_mode || 0,
+                merge_mode: router.merge_mode || 0,
+                dpad_mode: router.dpad_mode || 0,
+                bt_input: this.el.querySelector('#btInputEnable').checked,
+            });
         } catch (e) {
-            this.log(`Failed to set Wiimote orientation: ${e.message}`, 'error');
+            this.log(`Failed to save: ${e.message}`, 'error');
         }
     }
 
