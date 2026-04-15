@@ -101,6 +101,11 @@ void pad_config_to_flash(const pad_device_config_t* config, pad_config_flash_t* 
         flash->joywing[i].scl = config->joywing[i].scl;
         flash->joywing[i].addr = config->joywing[i].addr;
     }
+
+    for (int i = 0; i < PAD_COMBO_MAX; i++) {
+        flash->combo[i].input_mask = config->combo[i].input_mask;
+        flash->combo[i].output_mask = config->combo[i].output_mask;
+    }
 }
 
 const pad_device_config_t* pad_config_from_flash(const pad_config_flash_t* flash)
@@ -182,6 +187,11 @@ const pad_device_config_t* pad_config_from_flash(const pad_config_flash_t* flash
         runtime_config.joywing[i].sda = flash->joywing[i].sda;
         runtime_config.joywing[i].scl = flash->joywing[i].scl;
         runtime_config.joywing[i].addr = flash->joywing[i].addr;
+    }
+
+    for (int i = 0; i < PAD_COMBO_MAX; i++) {
+        runtime_config.combo[i].input_mask = flash->combo[i].input_mask;
+        runtime_config.combo[i].output_mask = flash->combo[i].output_mask;
     }
 
     return &runtime_config;

@@ -771,6 +771,32 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
    RESPONSIVE
    ================================================================ */
 
+/* Combo button checkboxes (hotkeys page) */
+.combo-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.combo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-muted);
+    transition: background 0.15s, border-color 0.15s;
+}
+.combo-btn:has(input:checked) {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.combo-btn input { display: none; }
+
 @media (max-width: 768px) {
     .app-layout {
         grid-template-columns: 1fr;

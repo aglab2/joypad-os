@@ -152,6 +152,14 @@ typedef struct {
         int8_t scl;             // SCL pin
         uint8_t addr;           // I2C address (default 0x49)
     } joywing[2];
+
+    // Button combo remaps (up to 4)
+    // When all input_mask buttons pressed, output_mask buttons are added
+    // and input_mask buttons are removed from output
+    struct {
+        uint32_t input_mask;    // 0 = disabled
+        uint32_t output_mask;
+    } combo[4];
 } pad_device_config_t;
 
 // ============================================================================

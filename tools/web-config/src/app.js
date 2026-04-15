@@ -7,6 +7,7 @@ import { ProfilesCard, BUTTON_NAMES, BUTTON_LABELS, REMAPPABLE_COUNT } from './c
 import { InputTestCard } from './components/input-test.js';
 import { UsbHostCard } from './components/usb-host.js';
 import { FeedbackCard } from './components/leds.js';
+import { HotkeysCard } from './components/hotkeys.js';
 import { BtHostCard } from './components/bt-host.js';
 import { AdvancedCard } from './components/advanced.js';
 
@@ -62,6 +63,7 @@ class JoypadConfigApp {
         this.btOutput = new BtOutputCard(document.getElementById('cardBtOutput'), this.protocol, log);
         this.padConfig = new PadConfigCard(document.getElementById('cardPadConfig'), this.protocol, log);
         this.feedback = new FeedbackCard(document.getElementById('cardFeedback'), this.protocol, log);
+        this.hotkeys = new HotkeysCard(document.getElementById('cardHotkeys'), this.protocol, log);
         this.usbHost = new UsbHostCard(document.getElementById('cardUsbHost'), this.protocol, log);
         this.btHost = new BtHostCard(document.getElementById('cardBtHost'), this.protocol, log);
         this.profiles = new ProfilesCard(document.getElementById('cardProfiles'), this.protocol, log);
@@ -74,6 +76,7 @@ class JoypadConfigApp {
         this.btOutput.render();
         this.padConfig.render();
         this.feedback.render();
+        this.hotkeys.render();
         this.usbHost.render();
         this.btHost.render();
         this.profiles.render();
@@ -246,10 +249,14 @@ class JoypadConfigApp {
             usbHostLink.style.display = this.usbHost.isAvailable() ? '' : 'none';
         }
 
-        // Hide Feedback nav link if device doesn't support pad config
+        // Hide Feedback/Hotkeys nav links if device doesn't support pad config
         const feedbackLink = document.getElementById('navFeedback');
         if (feedbackLink) {
             feedbackLink.style.display = this.feedback.isAvailable() ? '' : 'none';
+        }
+        const hotkeysLink = document.getElementById('navHotkeys');
+        if (hotkeysLink) {
+            hotkeysLink.style.display = this.hotkeys.isAvailable() ? '' : 'none';
         }
 
         // Hide Bluetooth output nav link if device has no BLE output
@@ -363,6 +370,7 @@ class JoypadConfigApp {
         await this.btOutput.load();
         await this.padConfig.load();
         await this.feedback.load();
+        await this.hotkeys.load();
         await this.usbHost.load();
         await this.btHost.load();
         // Check if pad config card is visible to determine nav visibility

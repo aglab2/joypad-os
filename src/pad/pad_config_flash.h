@@ -96,9 +96,16 @@ typedef struct {
         uint8_t addr;           // I2C address (default 0x49)
     } joywing[2];
 
+    // Button combo remaps (32 bytes — 4 slots × 8 bytes each)
+    // When all input_mask buttons pressed, output_mask buttons are added
+    #define PAD_COMBO_MAX 4
+    struct {
+        uint32_t input_mask;    // buttons that must all be pressed (0 = disabled)
+        uint32_t output_mask;   // buttons to output (replaces input combo buttons)
+    } combo[4];
+
     // Reserved for future use (pad to 256 bytes)
-    // 256 - 8 - 32 - 1 - 2 - 1 - 44 - 8 - 6 - 2 - 2 - 6 - 3 - 1 - 8 = 132
-    uint8_t reserved[132];
+    uint8_t reserved[100];
 } pad_config_flash_t;
 
 _Static_assert(sizeof(pad_config_flash_t) == 256, "pad_config_flash_t must be exactly 256 bytes");

@@ -571,6 +571,15 @@ static void pad_input_task(void) {
         }
 #endif
 
+        // Apply button combo remaps from config
+        for (int c = 0; c < PAD_COMBO_MAX; c++) {
+            uint32_t in = pad_devices[i]->combo[c].input_mask;
+            uint32_t out = pad_devices[i]->combo[c].output_mask;
+            if (in && (pad_events[i].buttons & in) == in) {
+                pad_events[i].buttons = (pad_events[i].buttons & ~in) | out;
+            }
+        }
+
         // Submit to router
         router_submit_input(&pad_events[i]);
     }

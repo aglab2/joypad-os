@@ -1523,6 +1523,14 @@ static void cmd_pad_config_get(const char* json)
                     flash_data.joywing[0].i2c_bus, flash_data.joywing[0].sda, flash_data.joywing[0].scl, flash_data.joywing[0].addr,
                     flash_data.joywing[1].i2c_bus, flash_data.joywing[1].sda, flash_data.joywing[1].scl, flash_data.joywing[1].addr);
 
+    // Combo remaps
+    pos += snprintf(response_buf + pos, sizeof(response_buf) - pos,
+                    ",\"combos\":[[%lu,%lu],[%lu,%lu],[%lu,%lu],[%lu,%lu]]",
+                    (unsigned long)flash_data.combo[0].input_mask, (unsigned long)flash_data.combo[0].output_mask,
+                    (unsigned long)flash_data.combo[1].input_mask, (unsigned long)flash_data.combo[1].output_mask,
+                    (unsigned long)flash_data.combo[2].input_mask, (unsigned long)flash_data.combo[2].output_mask,
+                    (unsigned long)flash_data.combo[3].input_mask, (unsigned long)flash_data.combo[3].output_mask);
+
     pos += snprintf(response_buf + pos, sizeof(response_buf) - pos, "}");
 
     send_json(response_buf);
@@ -1674,6 +1682,17 @@ static void cmd_pad_config_set(const char* json)
             if (json_get_int(json, key, &ival)) config.joywing[i].scl = (int8_t)ival;
             snprintf(key, sizeof(key), "joywing%d_addr", i);
             if (json_get_int(json, key, &ival)) config.joywing[i].addr = (uint8_t)ival;
+        }
+    }
+
+    // Combo remaps
+    {
+        char key[20];
+        for (int i = 0; i < PAD_COMBO_MAX; i++) {
+            snprintf(key, sizeof(key), "combo%d_in", i);
+            if (json_get_int(json, key, &ival)) config.combo[i].input_mask = (uint32_t)ival;
+            snprintf(key, sizeof(key), "combo%d_out", i);
+            if (json_get_int(json, key, &ival)) config.combo[i].output_mask = (uint32_t)ival;
         }
     }
 
