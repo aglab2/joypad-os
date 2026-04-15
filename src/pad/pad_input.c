@@ -266,6 +266,8 @@ static void pad_init_device_pins(const pad_device_config_t* config) {
     pad_init_button_pin(config->a2, ah);
     pad_init_button_pin(config->l4, ah);
     pad_init_button_pin(config->r4, ah);
+    pad_init_button_pin(config->f1, ah);
+    pad_init_button_pin(config->f2, ah);
 
     // Initialize toggle switch pins
     for (int t = 0; t < 2; t++) {
@@ -343,8 +345,12 @@ static void pad_poll_device(uint8_t device_index) {
     if (pad_read_button(config->a3, ah)) buttons |= JP_BUTTON_A3;
     if (pad_read_button(config->a4, ah)) buttons |= JP_BUTTON_A4;
 
-    // Extra buttons (L4/R4 mapped to L2/R2 digital for now)
-    // TODO: Add proper L4/R4 button defines if needed
+    if (pad_read_button(config->l4, ah)) buttons |= JP_BUTTON_L4;
+    if (pad_read_button(config->r4, ah)) buttons |= JP_BUTTON_R4;
+
+    // Function keys (internal only — for hotkey combos)
+    if (pad_read_button(config->f1, ah)) buttons |= JP_BUTTON_F1;
+    if (pad_read_button(config->f2, ah)) buttons |= JP_BUTTON_F2;
 
     // Simple debounce: only update if same as previous read
     // (This filters out single-sample glitches)

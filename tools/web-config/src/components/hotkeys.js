@@ -10,7 +10,9 @@ const ACTIONS = [
     { id: 1, name: 'D-Pad → D-Pad' },
     { id: 2, name: 'D-Pad → Left Stick' },
     { id: 3, name: 'D-Pad → Right Stick' },
-    { id: 4, name: 'Next Profile' },
+    { id: 4, name: 'Cycle D-Pad Mode' },
+    { id: 5, name: 'Next Profile' },
+    { id: 6, name: 'Previous Profile' },
 ];
 
 export class HotkeysCard {
@@ -83,7 +85,7 @@ export class HotkeysCard {
     }
 
     maskToChecks(prefix, mask) {
-        for (let i = 0; i < 22; i++) {
+        for (let i = 0; i < 24; i++) {
             const cb = this.el.querySelector(`#${prefix}_${i}`);
             if (cb) cb.checked = (mask & (1 << i)) !== 0;
         }
@@ -91,7 +93,7 @@ export class HotkeysCard {
 
     checksToMask(prefix) {
         let mask = 0;
-        for (let i = 0; i < 22; i++) {
+        for (let i = 0; i < 24; i++) {
             const cb = this.el.querySelector(`#${prefix}_${i}`);
             if (cb && cb.checked) mask |= (1 << i);
         }

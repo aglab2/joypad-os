@@ -801,7 +801,14 @@ void router_submit_input(const input_event_t* event) {
                 }
                 remapped.buttons &= ~in;
                 break;
-            case 4:  // Next Profile
+            case 4:  // Cycle D-Pad mode
+                if (!router_combos[c].fired) {
+                    router_set_dpad_mode((global_dpad_mode + 1) % 3);
+                    router_combos[c].fired = true;
+                }
+                remapped.buttons &= ~in;
+                break;
+            case 5:  // Next Profile
                 if (!router_combos[c].fired) {
                     extern void profile_cycle_next(uint8_t output);
                     profile_cycle_next(0);
@@ -809,9 +816,27 @@ void router_submit_input(const input_event_t* event) {
                 }
                 remapped.buttons &= ~in;
                 break;
+            case 6:  // Previous Profile
+                if (!router_combos[c].fired) {
+                    extern void profile_cycle_prev(uint8_t output);
+                    profile_cycle_prev(0);
+                    router_combos[c].fired = true;
+                }
+                remapped.buttons &= ~in;
+                break;
         }
     }
     if (did_remap) event = &remapped;
+
+    // Strip function keys from output (F1/F2 are internal-only for hotkey combos)
+    if (did_remap) {
+        remapped.buttons &= ~JP_BUTTON_FN_MASK;
+    } else if (event->buttons & JP_BUTTON_FN_MASK) {
+        remapped = *event;
+        remapped.buttons &= ~JP_BUTTON_FN_MASK;
+        did_remap = true;
+        event = &remapped;
+    }
 
     // Apply global d-pad mode remap (d-pad buttons → analog stick)
     if (global_dpad_mode > 0) {

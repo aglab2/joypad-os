@@ -84,6 +84,10 @@ typedef struct {
     int16_t l4;                 // Extra left trigger/paddle
     int16_t r4;                 // Extra right trigger/paddle
 
+    // Function keys (internal only — for hotkey combos, never output to host)
+    int16_t f1;
+    int16_t f2;
+
     // Toggle switches (up to 2, each with configurable function)
     struct {
         int16_t pin;            // GPIO pin (-1 = disabled)
@@ -222,6 +226,8 @@ extern const InputInterface pad_input_interface;
     .a4 = PAD_PIN_DISABLED, \
     .l4 = PAD_PIN_DISABLED, \
     .r4 = PAD_PIN_DISABLED, \
+    .f1 = PAD_PIN_DISABLED, \
+    .f2 = PAD_PIN_DISABLED, \
     .toggle = { \
         { .pin = PAD_PIN_DISABLED, .function = 0, .invert = false }, \
         { .pin = PAD_PIN_DISABLED, .function = 0, .invert = false }, \

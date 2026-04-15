@@ -1515,7 +1515,7 @@ static void cmd_pad_config_get(const char* json)
 
     // Buttons array
     pos += snprintf(response_buf + pos, sizeof(response_buf) - pos, ",\"buttons\":[");
-    for (int i = 0; i < 22; i++) {
+    for (int i = 0; i < PAD_BTN_COUNT; i++) {
         if (i > 0) pos += snprintf(response_buf + pos, sizeof(response_buf) - pos, ",");
         pos += snprintf(response_buf + pos, sizeof(response_buf) - pos, "%d", flash_data.buttons[i]);
     }
@@ -1624,9 +1624,9 @@ static void cmd_pad_config_set(const char* json)
     if (json_get_int(json, "dpad_mode", &ival)) config.dpad_mode = (uint8_t)ival;
 
     // Buttons array (22 int16_t values)
-    int16_t buttons[22];
-    for (int i = 0; i < 22; i++) buttons[i] = PAD_PIN_DISABLED;
-    int btn_count = json_get_int16_array(json, "buttons", buttons, 22);
+    int16_t buttons[PAD_BTN_COUNT];
+    for (int i = 0; i < PAD_BTN_COUNT; i++) buttons[i] = PAD_PIN_DISABLED;
+    int btn_count = json_get_int16_array(json, "buttons", buttons, PAD_BTN_COUNT);
     if (btn_count > 0) {
         config.dpad_up    = buttons[PAD_BTN_DPAD_UP];
         config.dpad_down  = buttons[PAD_BTN_DPAD_DOWN];
@@ -1798,7 +1798,7 @@ static void cmd_pad_config_pins(const char* json)
     // Button names for UI labels
     pos += snprintf(response_buf + pos, sizeof(response_buf) - pos,
                     ",\"button_names\":[");
-    for (int i = 0; i < 22; i++) {
+    for (int i = 0; i < PAD_BTN_COUNT; i++) {
         if (i > 0) pos += snprintf(response_buf + pos, sizeof(response_buf) - pos, ",");
         pos += snprintf(response_buf + pos, sizeof(response_buf) - pos,
                         "\"%s\"", pad_button_names[i]);

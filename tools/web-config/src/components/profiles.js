@@ -3,7 +3,7 @@
 const BUTTON_NAMES = [
     'B1', 'B2', 'B3', 'B4', 'L1', 'R1', 'L2', 'R2',
     'S1', 'S2', 'L3', 'R3', 'DU', 'DD', 'DL', 'DR',
-    'A1', 'A2', 'A3', 'A4', 'L4', 'R4'
+    'A1', 'A2', 'A3', 'A4', 'L4', 'R4', 'F1', 'F2'
 ];
 
 const BUTTON_LABELS = {
@@ -13,9 +13,10 @@ const BUTTON_LABELS = {
     'DU': 'D-Pad Up', 'DD': 'D-Pad Down', 'DL': 'D-Pad Left', 'DR': 'D-Pad Right',
     'A1': 'Home / Guide', 'A2': 'Capture / Touchpad',
     'A3': 'Aux 3', 'A4': 'Aux 4', 'L4': 'Left Paddle', 'R4': 'Right Paddle',
+    'F1': 'Function 1', 'F2': 'Function 2',
 };
 
-const REMAPPABLE_COUNT = 22;
+const REMAPPABLE_COUNT = 22;  // F1/F2 not remappable in profiles (internal only)
 const FLAG_SWAP_STICKS = 1;
 const FLAG_INVERT_LY = 2;
 const FLAG_INVERT_RY = 4;

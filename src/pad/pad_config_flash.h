@@ -46,9 +46,9 @@ typedef struct {
     // Deadzone (1 byte)
     uint8_t deadzone;
 
-    // Digital button pins — 22 buttons (44 bytes)
-    // Order: dpad UDLR, b1-b4, l1/r1/l2/r2, s1/s2, l3/r3, a1/a2, l4/r4
-    int16_t buttons[22];
+    // Digital button pins — 24 buttons (48 bytes)
+    // Order: dpad UDLR, b1-b4, l1/r1/l2/r2, s1/s2, l3/r3, a1-a4, l4/r4, f1/f2
+    int16_t buttons[24];
 
     // Toggle switches (8 bytes — 2 slots × 4 bytes each)
     #define PAD_TOGGLE_MAX 2
@@ -104,7 +104,9 @@ typedef struct {
     #define PAD_COMBO_ACTION_DPAD_DPAD   0x01  // Set d-pad mode: D-Pad
     #define PAD_COMBO_ACTION_DPAD_LSTICK 0x02  // Set d-pad mode: Left Stick
     #define PAD_COMBO_ACTION_DPAD_RSTICK 0x03  // Set d-pad mode: Right Stick
-    #define PAD_COMBO_ACTION_PROFILE_NEXT 0x04 // Next profile
+    #define PAD_COMBO_ACTION_DPAD_CYCLE   0x04  // Cycle d-pad mode (dpad→lstick→rstick)
+    #define PAD_COMBO_ACTION_PROFILE_NEXT 0x05 // Next profile
+    #define PAD_COMBO_ACTION_PROFILE_PREV 0x06 // Previous profile
     #define PAD_COMBO_ACTION_SHIFT       24
     #define PAD_COMBO_ACTION_MASK        0xFF000000
     #define PAD_COMBO_BUTTON_MASK        0x003FFFFF
@@ -117,7 +119,7 @@ typedef struct {
     uint8_t dpad_mode;
 
     // Reserved for future use (pad to 256 bytes)
-    uint8_t reserved[99];
+    uint8_t reserved[95];
 } pad_config_flash_t;
 
 _Static_assert(sizeof(pad_config_flash_t) == 256, "pad_config_flash_t must be exactly 256 bytes");
@@ -149,7 +151,9 @@ _Static_assert(sizeof(pad_config_flash_t) == 256, "pad_config_flash_t must be ex
 #define PAD_BTN_A4          19
 #define PAD_BTN_L4          20
 #define PAD_BTN_R4          21
-#define PAD_BTN_COUNT       22
+#define PAD_BTN_F1          22
+#define PAD_BTN_F2          23
+#define PAD_BTN_COUNT       24
 
 // ============================================================================
 // FLAGS
