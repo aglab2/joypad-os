@@ -12,6 +12,7 @@
 #include "core/output_interface.h"
 #include "usb/usbd/usbd.h"
 #include "core/services/leds/leds.h"
+#include "core/services/leds/neopixel/ws2812.h"
 #include "core/buttons.h"
 #include "platform/platform.h"
 
@@ -202,6 +203,18 @@ void app_init(void)
     // Initialize pad config storage (needed for CDC commands on all platforms)
 #ifdef CONFIG_PAD_INPUT
     pad_config_flash_init();
+    {
+        // Apply LED config from pad config (before pad device init)
+        const pad_device_config_t* led_cfg = pad_config_load_runtime();
+        if (led_cfg) {
+            if (led_cfg->led_pin >= 0) {
+                neopixel_set_pin(led_cfg->led_pin);
+                neopixel_init();  // Reinitialize with new pin
+            } else if (led_cfg->led_pin == -1) {
+                neopixel_disable();
+            }
+        }
+    }
 #endif
 
     // Configure pad input (GPIO buttons) — flash config overrides compile-time default

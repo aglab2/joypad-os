@@ -27,7 +27,8 @@
 
 #define BLUE_LED_PIN       10  // P1.10, active HIGH
 #define NEOPIXEL_POWER_PIN 14  // P1.14
-#define NEOPIXEL_PIN       16  // P0.16
+#define NEOPIXEL_PIN_DEFAULT 16  // P0.16
+static uint8_t neopixel_pin = NEOPIXEL_PIN_DEFAULT;
 
 // PWM WS2812 timing at 16 MHz clock (62.5 ns per tick)
 // COUNTERTOP = 20 → period = 1.25 μs = 800 kHz WS2812 frequency
@@ -94,7 +95,7 @@ static void ws2812_send_pixel(uint8_t r, uint8_t g, uint8_t b)
     NRF_PWM3->ENABLE = 0;
 
     // Pin select: P0.16 (port 0 << 5 | pin 16 = 16)
-    NRF_PWM3->PSEL.OUT[0] = NEOPIXEL_PIN;
+    NRF_PWM3->PSEL.OUT[0] = neopixel_pin;
     NRF_PWM3->PSEL.OUT[1] = 0xFFFFFFFFUL;  // disconnected
     NRF_PWM3->PSEL.OUT[2] = 0xFFFFFFFFUL;
     NRF_PWM3->PSEL.OUT[3] = 0xFFFFFFFFUL;
@@ -188,6 +189,9 @@ static bool neopixel_ready = false;
 static const struct device *led_port;
 #endif
 
+// Disabled flag — when true, neopixel_task is a no-op
+static bool neopixel_disabled = false;
+
 // Override color (set by app for USB mode indication)
 static uint8_t override_r = 0, override_g = 0, override_b = 0;
 static bool has_override_color = false;
@@ -238,6 +242,28 @@ static void set_off(void)
 // PUBLIC API
 // ============================================================================
 
+void neopixel_set_pin(int8_t pin) {
+#ifdef BOARD_FEATHER_NRF52840
+    if (pin >= 0) {
+        neopixel_pin = (uint8_t)pin;
+        printf("[led_nrf] NeoPixel pin override: GPIO %d\n", pin);
+    }
+#else
+    (void)pin;
+#endif
+}
+
+void neopixel_disable(void) {
+#ifdef BOARD_FEATHER_NRF52840
+    if (neopixel_ready) {
+        neo_set_off();
+        neopixel_ready = false;
+    }
+#endif
+    neopixel_disabled = true;
+    printf("[led_nrf] NeoPixel disabled\n");
+}
+
 void neopixel_init(void)
 {
 #ifdef BOARD_FEATHER_NRF52840
@@ -256,18 +282,18 @@ void neopixel_init(void)
     }
 
     // Configure P0.16 as output with high drive for NeoPixel data
-    nrf_gpio_cfg(NEOPIXEL_PIN,
+    nrf_gpio_cfg(neopixel_pin,
                  NRF_GPIO_PIN_DIR_OUTPUT,
                  NRF_GPIO_PIN_INPUT_DISCONNECT,
                  NRF_GPIO_PIN_NOPULL,
                  NRF_GPIO_PIN_H0H1,
                  NRF_GPIO_PIN_NOSENSE);
-    nrf_gpio_pin_clear(NEOPIXEL_PIN);
+    nrf_gpio_pin_clear(neopixel_pin);
     k_busy_wait(100);
 
     neopixel_ready = true;
     printf("[led_nrf] NeoPixel ready (PWM+EasyDMA on P0.%d)\n",
-           NEOPIXEL_PIN);
+           neopixel_pin);
 
     blue_led_set(true);
 #else
@@ -310,6 +336,7 @@ bool neopixel_is_indicating(void)
 
 void neopixel_task(int pat)
 {
+    if (neopixel_disabled) return;
 #ifdef BOARD_FEATHER_NRF52840
     if (!neopixel_ready) return;
 #else

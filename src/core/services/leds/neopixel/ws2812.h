@@ -8,6 +8,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Set NeoPixel data pin override (call before neopixel_init, -1 = use default)
+void neopixel_set_pin(int8_t pin);
+
+// Disable NeoPixel (stops all output, neopixel_task becomes no-op)
+void neopixel_disable(void);
+
 // Initialize NeoPixel LED
 void neopixel_init(void);
 

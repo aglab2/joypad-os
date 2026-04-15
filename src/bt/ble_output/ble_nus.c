@@ -15,6 +15,7 @@
 #include "btstack_event.h"
 #include "ble/att_server.h"
 #include "ble/gatt-service/nordic_spp_service_server.h"
+#include "gap.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -172,6 +173,8 @@ static void nus_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
                     nus_connected = true;
                     printf("[ble_nus] NUS connected (handle=0x%04x, MTU=%d)\n",
                            nus_con_handle, att_server_get_mtu(nus_con_handle));
+                    // Request faster connection interval for streaming (7.5-15ms)
+                    gap_request_connection_parameter_update(nus_con_handle, 6, 12, 0, 200);
                     break;
 
                 case GATTSERVICE_SUBEVENT_SPP_SERVICE_DISCONNECTED:
@@ -203,6 +206,7 @@ void ble_nus_init(void)
     // Initialize protocol context with NUS transport
     cdc_protocol_init(&nus_protocol_ctx, cdc_commands_process);
     nus_protocol_ctx.write = nus_write;
+    nus_protocol_ctx.ble_transport = true;
 
     // Set up context callback for chunked TX flow control
     nus_send_request.callback = &nus_send_next_chunk;

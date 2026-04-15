@@ -13,22 +13,31 @@ export class LedsCard {
             <div class="card" id="ledsCard" style="display:none;">
                 <h2>LEDs</h2>
                 <div class="card-content">
+                    <p class="hint">Controls onboard LED (NeoPixel, RGB, or single-color).</p>
                     <div class="pad-form-row">
-                        <span class="label">LED Pin</span>
-                        <input type="number" id="ledPin" min="-1" max="47" value="-1">
-                        <span class="hint" id="ledPinHint"></span>
+                        <span class="label">Enable</span>
+                        <label class="toggle"><input type="checkbox" id="ledEnable"><span class="toggle-slider"></span></label>
                     </div>
-                    <div class="pad-form-row">
-                        <span class="label">LED Count</span>
-                        <input type="number" id="ledCount" min="0" max="16" value="0">
+                    <div id="ledSettings" style="display:none;">
+                        <div class="pad-form-row">
+                            <span class="label">LED Pin</span>
+                            <input type="number" id="ledPin" min="0" max="47" value="0">
+                            <span class="hint" id="ledPinHint"></span>
+                        </div>
+                        <div class="pad-form-row">
+                            <span class="label">LED Count</span>
+                            <input type="number" id="ledCount" min="1" max="16" value="1">
+                        </div>
                     </div>
-                    <p class="hint">Set pin to -1 to disable LEDs. Default is from compile-time board config.</p>
                     <div class="buttons" style="margin-top: 12px;">
                         <button id="ledsSaveBtn">Save &amp; Reboot</button>
                     </div>
                 </div>
             </div>`;
 
+        this.el.querySelector('#ledEnable').addEventListener('change', (e) => {
+            this.el.querySelector('#ledSettings').style.display = e.target.checked ? '' : 'none';
+        });
         this.el.querySelector('#ledsSaveBtn').addEventListener('click', () => this.save());
     }
 
@@ -45,19 +54,37 @@ export class LedsCard {
             this.visible = true;
             this.currentConfig = config;
 
-            // Show raw pad config values
-            const hasSaved = config.led_pin !== undefined && config.led_pin >= 0;
             const sysPin = config.sys_led_pin;
             const sysCount = config.sys_led_count;
+            const savedPin = config.led_pin;
+            const savedCount = config.led_count;
 
-            if (hasSaved) {
-                // User has saved a custom LED config
-                this.el.querySelector('#ledPin').value = config.led_pin;
-                this.el.querySelector('#ledCount').value = config.led_count || 0;
+            // Determine enabled state and pin/count values
+            const enableToggle = this.el.querySelector('#ledEnable');
+            const settings = this.el.querySelector('#ledSettings');
+
+            if (savedPin !== undefined && savedPin >= 0) {
+                // User has saved an enabled LED config
+                enableToggle.checked = true;
+                settings.style.display = '';
+                this.el.querySelector('#ledPin').value = savedPin;
+                this.el.querySelector('#ledCount').value = savedCount || 1;
+            } else if (savedPin !== undefined && savedPin < 0) {
+                // User explicitly disabled LEDs
+                enableToggle.checked = false;
+                settings.style.display = 'none';
+                this.el.querySelector('#ledPin').value = sysPin >= 0 ? sysPin : 0;
+                this.el.querySelector('#ledCount').value = sysCount || 1;
             } else if (sysPin >= 0) {
-                // No saved config — show system defaults
+                // No saved config — show system defaults as enabled
+                enableToggle.checked = true;
+                settings.style.display = '';
                 this.el.querySelector('#ledPin').value = sysPin;
-                this.el.querySelector('#ledCount').value = sysCount || 0;
+                this.el.querySelector('#ledCount').value = sysCount || 1;
+            } else {
+                // No system default either
+                enableToggle.checked = false;
+                settings.style.display = 'none';
             }
 
             // Show default hint
@@ -86,8 +113,8 @@ export class LedsCard {
             invert_ly: this.currentConfig.invert_ly || false,
             invert_rx: this.currentConfig.invert_rx || false,
             invert_ry: this.currentConfig.invert_ry || false,
-            led_pin: parseInt(this.el.querySelector('#ledPin').value),
-            led_count: parseInt(this.el.querySelector('#ledCount').value),
+            led_pin: this.el.querySelector('#ledEnable').checked ? parseInt(this.el.querySelector('#ledPin').value) : -1,
+            led_count: this.el.querySelector('#ledEnable').checked ? parseInt(this.el.querySelector('#ledCount').value) : 0,
             speaker_pin: this.currentConfig.speaker_pin !== undefined ? this.currentConfig.speaker_pin : -1,
             speaker_enable_pin: this.currentConfig.speaker_enable_pin !== undefined ? this.currentConfig.speaker_enable_pin : -1,
             usb_host_dp: this.currentConfig.usb_host_dp !== undefined ? this.currentConfig.usb_host_dp : -1,

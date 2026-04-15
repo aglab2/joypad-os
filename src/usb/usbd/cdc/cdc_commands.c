@@ -1896,7 +1896,8 @@ void cdc_commands_send_input_event(uint32_t buttons, const uint8_t* axes)
     uint32_t now = platform_time_ms();
     bool changed = (buttons != last_buttons || memcmp(axes, last_axes, 7) != 0);
 
-    if (!changed && (now - last_send_ms) < 16) return;  // ~60Hz idle rate
+    uint32_t min_interval = stream_ctx->ble_transport ? 33 : 16;
+    if (!changed && (now - last_send_ms) < min_interval) return;
 
     last_buttons = buttons;
     memcpy(last_axes, axes, 7);
@@ -1976,8 +1977,9 @@ void cdc_commands_send_player_input(uint8_t player, uint8_t dev_addr,
 
     stream_throttle_t* th = get_input_throttle(dev_addr);
     uint32_t now = platform_time_ms();
+    uint32_t min_interval = stream_ctx->ble_transport ? 33 : 16;  // 30Hz BLE, 60Hz USB
     bool changed = (buttons != th->buttons || memcmp(axes, th->axes, 7) != 0);
-    if (!changed && (now - th->last_ms) < 16) return;
+    if (!changed && (now - th->last_ms) < min_interval) return;
 
     bool first = (th->buttons == 0xFFFFFFFF);
     th->buttons = buttons;
@@ -2012,9 +2014,10 @@ void cdc_commands_send_player_output(uint8_t player, uint32_t buttons,
     if (!stream_throttle_init) stream_throttle_reset();
 
     uint32_t now = platform_time_ms();
+    uint32_t min_interval = stream_ctx->ble_transport ? 33 : 16;
     bool changed = (buttons != last_po_buttons[player] ||
                     memcmp(axes, last_po_axes[player], 7) != 0);
-    if (!changed && (now - last_po_ms[player]) < 16) return;
+    if (!changed && (now - last_po_ms[player]) < min_interval) return;
 
     last_po_buttons[player] = buttons;
     memcpy(last_po_axes[player], axes, 7);

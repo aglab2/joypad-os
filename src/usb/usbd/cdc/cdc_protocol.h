@@ -99,6 +99,7 @@ typedef struct {
     cdc_transport_write_t write; // Transport write function (NULL = USB CDC default)
     bool input_streaming;       // Input event streaming enabled
     bool log_streaming;         // Debug log streaming enabled
+    bool ble_transport;         // True if transport is BLE NUS (slower throttle)
 } cdc_protocol_t;
 
 // ============================================================================

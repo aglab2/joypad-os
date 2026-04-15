@@ -49,6 +49,7 @@
 static PIO pio;
 static uint sm;
 
+static bool neopixel_disabled = false;
 static absolute_time_t init_time;
 static absolute_time_t current_time;
 static absolute_time_t loop_time;
@@ -389,6 +390,15 @@ const struct {
         {pattern_brgpy,   "B R G P Y"},  // 5 controllers alt
 };
 
+void neopixel_set_pin(int8_t pin) {
+    (void)pin; // RP2040: PIO pin set at compile time via WS2812_PIN
+}
+
+void neopixel_disable(void) {
+    neopixel_disabled = true;
+    printf("[ws2812] NeoPixel disabled\n");
+}
+
 void neopixel_init()
 {
 #ifdef CONFIG_NO_NEOPIXEL
@@ -447,6 +457,7 @@ void neopixel_task(int pat)
 #ifdef CONFIG_NO_NEOPIXEL
     return;
 #endif
+    if (neopixel_disabled) return;
 
     current_time = get_absolute_time();
 
