@@ -154,14 +154,24 @@ export class PadConfigCard {
                         </div>
                     </div>`).join('')}
 
-                    <h3 style="margin-top: 12px; margin-bottom: 8px;">I2C Expander</h3>
-                    <div class="pad-form-row">
-                        <span class="label">SDA Pin</span>
-                        <input type="number" id="padI2cSda" min="-1" max="47" value="-1">
+                    <h3 style="margin-top: 12px; margin-bottom: 8px;">GPIO Expander (I2C)</h3>
+                    <p class="hint">PCA9555 / TCA9555 at 0x20, 0x21</p>
+                    <div class="toggle-row" style="margin-bottom: 8px;">
+                        <label class="toggle">
+                            <input type="checkbox" id="padI2cEnable">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Enable</span>
                     </div>
-                    <div class="pad-form-row">
-                        <span class="label">SCL Pin</span>
-                        <input type="number" id="padI2cScl" min="-1" max="47" value="-1">
+                    <div id="padI2cSettings" style="display:none;">
+                        <div class="pad-form-row">
+                            <span class="label">SDA Pin</span>
+                            <input type="number" id="padI2cSda" min="0" max="47" value="0">
+                        </div>
+                        <div class="pad-form-row">
+                            <span class="label">SCL Pin</span>
+                            <input type="number" id="padI2cScl" min="0" max="47" value="0">
+                        </div>
                     </div>
 
                 </div>
@@ -195,6 +205,10 @@ export class PadConfigCard {
                     this.el.querySelector(`#padJoywing${i}Enabled`).checked ? '' : 'none';
             });
         }
+        this.el.querySelector('#padI2cEnable').addEventListener('change', (e) => {
+            this.el.querySelector('#padI2cSettings').style.display = e.target.checked ? '' : 'none';
+            this.rebuildPinSelects();
+        });
         this.el.querySelector('#padSaveBtn').addEventListener('click', () => this.save());
         this.el.querySelector('#padResetBtn').addEventListener('click', () => this.reset());
         this.el.querySelector('#padDeadzone').addEventListener('input', (e) => {
@@ -203,9 +217,7 @@ export class PadConfigCard {
     }
 
     hasI2C() {
-        const sda = parseInt(this.el.querySelector('#padI2cSda')?.value ?? -1);
-        const scl = parseInt(this.el.querySelector('#padI2cScl')?.value ?? -1);
-        return sda >= 0 && scl >= 0;
+        return this.el.querySelector('#padI2cEnable')?.checked || false;
     }
 
     buildPinSelect(id, value, includeI2C) {
@@ -250,12 +262,16 @@ export class PadConfigCard {
 
             this.el.querySelector('#padActiveHigh').value = String(config.active_high || false);
 
-            // I2C (set before button pins so buildPinSelect can check hasI2C)
-            this.el.querySelector('#padI2cSda').value = config.i2c_sda !== undefined ? config.i2c_sda : -1;
-            this.el.querySelector('#padI2cScl').value = config.i2c_scl !== undefined ? config.i2c_scl : -1;
-
-            this.el.querySelector('#padI2cSda').addEventListener('change', () => this.rebuildPinSelects());
-            this.el.querySelector('#padI2cScl').addEventListener('change', () => this.rebuildPinSelects());
+            // I2C Expander (set before button pins so buildPinSelect can check hasI2C)
+            const i2cSda = config.i2c_sda !== undefined ? config.i2c_sda : -1;
+            const i2cScl = config.i2c_scl !== undefined ? config.i2c_scl : -1;
+            const i2cEnabled = i2cSda >= 0 && i2cScl >= 0;
+            this.el.querySelector('#padI2cEnable').checked = i2cEnabled;
+            this.el.querySelector('#padI2cSettings').style.display = i2cEnabled ? '' : 'none';
+            if (i2cEnabled) {
+                this.el.querySelector('#padI2cSda').value = i2cSda;
+                this.el.querySelector('#padI2cScl').value = i2cScl;
+            }
 
             // Button pins
             const container = this.el.querySelector('#padButtonPins');
@@ -389,8 +405,8 @@ export class PadConfigCard {
             invert_ly: this.el.querySelector('#padAdcLYInvert').checked,
             invert_rx: this.el.querySelector('#padAdcRXInvert').checked,
             invert_ry: this.el.querySelector('#padAdcRYInvert').checked,
-            i2c_sda: parseInt(this.el.querySelector('#padI2cSda').value),
-            i2c_scl: parseInt(this.el.querySelector('#padI2cScl').value),
+            i2c_sda: this.el.querySelector('#padI2cEnable').checked ? parseInt(this.el.querySelector('#padI2cSda').value) : -1,
+            i2c_scl: this.el.querySelector('#padI2cEnable').checked ? parseInt(this.el.querySelector('#padI2cScl').value) : -1,
             deadzone: parseInt(this.el.querySelector('#padDeadzone').value),
             buttons,
             ...(() => {
