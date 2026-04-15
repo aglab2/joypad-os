@@ -10,7 +10,7 @@ export class UsbHostCard {
     render() {
         this.el.innerHTML = `
             <div class="card" id="usbHostCard" style="display:none;">
-                <h2>USB Host (PIO-USB)</h2>
+                <h2>USB Host</h2>
                 <div class="card-content">
                     <div class="toggle-row" style="margin-bottom: 12px;">
                         <label class="toggle">
