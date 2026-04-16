@@ -98,6 +98,7 @@ CONSOLE_n642usb := joypad_n642usb
 CONSOLE_nuon2usb := joypad_nuon2usb
 CONSOLE_gc2usb := joypad_gc2usb
 CONSOLE_wii2usb := joypad_wii2usb
+CONSOLE_wii2gc := joypad_wii2gc
 CONSOLE_lodgenet2usb := joypad_lodgenet2usb
 CONSOLE_lodgenet2n64 := joypad_lodgenet2n64
 CONSOLE_lodgenet2gc := joypad_lodgenet2gc
@@ -167,6 +168,7 @@ APP_nuon2usb_kb2040 := kb2040 nuon2usb nuon2usb_kb2040 Nuon USB
 APP_nuon2usb_pico_w := pico_w nuon2usb nuon2usb_pico_w Nuon USB
 APP_gc2usb_kb2040 := kb2040 gc2usb gc2usb_kb2040 GameCube USB
 APP_wii2usb_kb2040 := kb2040 wii2usb wii2usb_kb2040 Wii USB
+APP_wii2gc_kb2040 := kb2040 wii2gc wii2gc_kb2040 Wii GameCube
 APP_lodgenet2usb_pico := pico lodgenet2usb lodgenet2usb_pico LodgeNet USB
 APP_lodgenet2usb_pico2 := pico2 lodgenet2usb lodgenet2usb_pico2 LodgeNet USB
 APP_lodgenet2n64_pico := pico lodgenet2n64 lodgenet2n64_pico LodgeNet N64
@@ -845,6 +847,10 @@ gc2usb_kb2040:
 wii2usb_kb2040:
 	$(call build_app,wii2usb_kb2040)
 
+.PHONY: wii2gc_kb2040
+wii2gc_kb2040:
+	$(call build_app,wii2gc_kb2040)
+
 .PHONY: neogeo2usb_kb2040
 neogeo2usb_kb2040:
 	$(call build_app,neogeo2usb_kb2040)
@@ -1218,6 +1224,10 @@ flash-gc2usb_kb2040:
 .PHONY: flash-wii2usb_kb2040
 flash-wii2usb_kb2040:
 	@$(MAKE) --no-print-directory _flash_app APP_NAME=wii2usb_kb2040
+
+.PHONY: flash-wii2gc_kb2040
+flash-wii2gc_kb2040:
+	@$(MAKE) --no-print-directory _flash_app APP_NAME=wii2gc_kb2040
 
 .PHONY: flash-neogeo2usb_kb2040
 flash-neogeo2usb_kb2040:
