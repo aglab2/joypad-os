@@ -60,13 +60,9 @@ static void on_button_event(button_event_t event)
 
         case BUTTON_EVENT_DOUBLE_CLICK: {
             // Double-click to cycle USB output mode
-            printf("[app:usb2neogeo] Double-click - switching USB output mode...\n");
-            tud_task();
-            sleep_ms(50);
-            tud_task();
-
             usb_output_mode_t next = usbd_get_next_mode();
-            printf("[app:usb2neogeo] Switching to %s\n", usbd_get_mode_name(next));
+            printf("[app:usb2neogeo] Double-click - switching USB mode → %s\n",
+                   usbd_get_mode_name(next));
             usbd_set_mode(next);
             break;
         }

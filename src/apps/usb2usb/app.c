@@ -161,22 +161,10 @@ static void on_button_event(button_event_t event)
             break;
 
         case BUTTON_EVENT_DOUBLE_CLICK: {
-            // Double-click to cycle USB output mode
-            printf("[app:usb2usb] Double-click - switching USB output mode...\n");
-#ifdef PLATFORM_ESP32
-            tud_task_ext(1, false);
-#else
-            tud_task();
-#endif
-            platform_sleep_ms(50);
-#ifdef PLATFORM_ESP32
-            tud_task_ext(1, false);
-#else
-            tud_task();
-#endif
-
+            // Cycle to next mode (usbd_set_mode flushes debug + saves to flash)
             usb_output_mode_t next = usbd_get_next_mode();
-            printf("[app:usb2usb] Switching to %s\n", usbd_get_mode_name(next));
+            printf("[app:usb2usb] Double-click - switching USB mode → %s\n",
+                   usbd_get_mode_name(next));
             usbd_set_mode(next);
 #if defined(OLED_I2C_INST) || defined(OLED_I2C_DISPLAY)
             joy_anim_event(JOY_EVENT_MODE_SWITCH);
@@ -319,12 +307,9 @@ static void oled_handle_buttons(void) {
     // Button B: cycle USB output mode
     if (!b && last_b && (now - debounce_b > 200)) {
         debounce_b = now;
-        printf("[app:usb2usb] OLED Button B - switching USB output mode...\n");
-        tud_task();
-        platform_sleep_ms(50);
-        tud_task();
         usb_output_mode_t next = usbd_get_next_mode();
-        printf("[app:usb2usb] Switching to %s\n", usbd_get_mode_name(next));
+        printf("[app:usb2usb] OLED Button B - switching USB mode → %s\n",
+               usbd_get_mode_name(next));
         usbd_set_mode(next);
     }
     last_b = b;

@@ -116,22 +116,11 @@ static void on_button_event(button_event_t event)
             break;
 
         case BUTTON_EVENT_DOUBLE_CLICK: {
-            printf("[app:controller] Button double-click - switching USB output mode...\n");
-            // Flush USB and give stack time to transmit
-            tud_task();
-            sleep_ms(50);
-            tud_task();
-
-            // Cycle to next mode using usbd's built-in cycle
-            usb_output_mode_t current = usbd_get_mode();
+            // Cycle to next mode (usbd_set_mode flushes debug + saves to flash)
             usb_output_mode_t next = usbd_get_next_mode();
-            printf("[app:controller] Switching from %s to %s\n",
-                   usbd_get_mode_name(current), usbd_get_mode_name(next));
-            tud_task();
-            sleep_ms(50);
-            tud_task();
-
-            usbd_set_mode(next);  // This will reset the device
+            printf("[app:controller] Double-click - switching USB mode → %s\n",
+                   usbd_get_mode_name(next));
+            usbd_set_mode(next);
             break;
         }
 
