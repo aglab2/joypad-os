@@ -432,12 +432,6 @@ static void process_report_dynamic(bthid_gamepad_data_t* gp, const uint8_t* data
         }
     }
 
-    // Keep sticks within range [1-255]
-    if (lx == 0) lx = 1;
-    if (ly == 0) ly = 1;
-    if (rx == 0) rx = 1;
-    if (ry == 0) ry = 1;
-
     gp->event.buttons = buttons;
     gp->event.button_count = buttonCount;
     gp->event.analog[ANALOG_LX] = lx;
