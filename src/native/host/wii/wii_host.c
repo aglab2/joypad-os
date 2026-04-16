@@ -5,6 +5,8 @@
 #include "core/router/router.h"
 #include "core/input_event.h"
 #include "core/buttons.h"
+#include "core/services/leds/leds.h"
+#include "core/services/profiles/profile.h"
 #include "platform/platform_i2c.h"
 #include "pico/time.h"
 #include <stdio.h>
@@ -31,6 +33,24 @@ static uint32_t         last_retry_us = 0;
 static bool             prev_connected = false;
 static uint32_t         prev_buttons = 0;
 static uint64_t         prev_analog  = 0;
+
+// Profile-cycle hotkey state: MINUS + DU/DD held ≥ 2s triggers cycle.
+#define WII_HOTKEY_HOLD_US   2000000
+static uint32_t         hotkey_combo_start_us = 0;
+static uint32_t         hotkey_combo_mask     = 0;  // which combo is being tracked
+static bool             hotkey_fired          = false;
+
+// LED scan-blink state (toggles each retry while hunting for a slave).
+static bool             led_scan_state        = false;
+
+// Per-accessory LED colors (dim so the status LED doesn't overpower the
+// player-index indication layered on top by core/services/leds).
+#define LED_WII_NUNCHUCK_R    0
+#define LED_WII_NUNCHUCK_G   16
+#define LED_WII_NUNCHUCK_B   24
+#define LED_WII_CLASSIC_R     0
+#define LED_WII_CLASSIC_G     0
+#define LED_WII_CLASSIC_B    40
 
 // ---- wii_ext transport vtable (thin wrappers over platform_i2c) -------------
 
@@ -159,6 +179,13 @@ void wii_host_task(void) {
             return;
         }
         last_retry_us = now;
+
+        // LED scan-blink: alternate dim white / off each retry tick.
+        led_scan_state = !led_scan_state;
+        leds_set_color(led_scan_state ? 8 : 0,
+                       led_scan_state ? 8 : 0,
+                       led_scan_state ? 8 : 0);
+
         if (wii_ext_start(&ext)) {
             printf("[wii_host] detected type=%d id=%02X:%02X:%02X:%02X:%02X:%02X\n",
                    (int)ext.type,
@@ -176,18 +203,61 @@ void wii_host_task(void) {
         if (prev_connected) {
             printf("[wii_host] disconnected\n");
             prev_connected = false;
+            leds_set_color(0, 0, 0);  // LED off on disconnect
         }
         return;
     }
     if (!prev_connected) {
         printf("[wii_host] connected type=%d\n", (int)state.type);
         prev_connected = true;
-        // Reset change-suppression sentinels so the very first event after
-        // (re)connect always submits — the router needs at least one event
-        // with non-default state to register the player and record its name.
-        // Using 0xFF... guarantees a mismatch against any real event.
         prev_buttons = 0xFFFFFFFFu;
         prev_analog  = 0xFFFFFFFFFFFFFFFFull;
+        // Status LED: solid per-accessory color on (re)connect.
+        if (state.type == WII_EXT_TYPE_NUNCHUCK) {
+            leds_set_color(LED_WII_NUNCHUCK_R, LED_WII_NUNCHUCK_G, LED_WII_NUNCHUCK_B);
+        } else {
+            leds_set_color(LED_WII_CLASSIC_R, LED_WII_CLASSIC_G, LED_WII_CLASSIC_B);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Profile-cycle hotkey: MINUS (S1) + D-pad Up/Down held ≥ 2 s.
+    // Only meaningful on accessories with a MINUS + D-pad (Classic/Pro).
+    // Nunchuck has neither so this block no-ops for it.
+    // ------------------------------------------------------------------
+    {
+        const uint32_t trigger_up   = WII_BTN_MINUS | WII_BTN_DU;
+        const uint32_t trigger_down = WII_BTN_MINUS | WII_BTN_DD;
+        uint32_t held = 0;
+        if ((state.buttons & trigger_up)   == trigger_up)   held = trigger_up;
+        if ((state.buttons & trigger_down) == trigger_down) held = trigger_down;
+
+        if (held) {
+            if (hotkey_combo_mask != held) {
+                hotkey_combo_mask     = held;
+                hotkey_combo_start_us = now;
+                hotkey_fired          = false;
+            } else if (!hotkey_fired &&
+                       (now - hotkey_combo_start_us) >= WII_HOTKEY_HOLD_US) {
+                // Resolve which output the app routes to, so this works
+                // for wii2usb, wii2gc, wii2pce, etc. without per-app glue.
+                output_target_t primary = router_get_primary_output();
+                if (primary == OUTPUT_TARGET_NONE) primary = OUTPUT_TARGET_USB_DEVICE;
+                if (held == trigger_up) {
+                    profile_cycle_next(primary);
+                    printf("[wii_host] profile: next (output=%d)\n", (int)primary);
+                } else {
+                    profile_cycle_prev(primary);
+                    printf("[wii_host] profile: prev (output=%d)\n", (int)primary);
+                }
+                leds_indicate_profile(profile_get_active_index(primary));
+                hotkey_fired = true;
+            }
+        } else {
+            hotkey_combo_mask     = 0;
+            hotkey_combo_start_us = 0;
+            hotkey_fired          = false;
+        }
     }
 
     input_event_t ev;
