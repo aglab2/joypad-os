@@ -777,7 +777,7 @@ void router_submit_input(const input_event_t* event) {
         static const char* transport_names[] = {
             [INPUT_TRANSPORT_NONE]       = "none",
             [INPUT_TRANSPORT_USB]        = "usb",
-            [INPUT_TRANSPORT_BT_CLASSIC] = "bt",
+            [INPUT_TRANSPORT_BT_CLASSIC] = "bt classic",
             [INPUT_TRANSPORT_BT_BLE]     = "ble",
             [INPUT_TRANSPORT_NATIVE]     = "native",
             [INPUT_TRANSPORT_I2C]        = "i2c",
