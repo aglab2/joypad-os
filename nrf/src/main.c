@@ -34,6 +34,7 @@ static uint8_t output_count = 0;
 static const InputInterface** inputs = NULL;
 static uint8_t input_count = 0;
 const OutputInterface* active_output = NULL;
+const OutputInterface* native_output = NULL;
 
 // ============================================================================
 // FAULT HANDLER — Zephyr's fault dump goes to UART console automatically.
