@@ -24,3 +24,19 @@ __attribute__((weak)) void wiimote_set_orient_mode(uint8_t mode) { (void)mode; }
 // btstack_host functions (used by cdc_commands.c)
 __attribute__((weak)) void btstack_host_delete_all_bonds(void) {}
 __attribute__((weak)) bool btstack_host_is_initialized(void) { return false; }
+__attribute__((weak)) bool btstack_host_is_scanning(void) { return false; }
+__attribute__((weak)) uint8_t btstack_classic_get_connection_count(void) { return 0; }
+__attribute__((weak)) bool btstack_host_get_last_connected(uint8_t bd_addr_out[6], char name_out[48])
+{
+    (void)bd_addr_out; (void)name_out;
+    return false;
+}
+__attribute__((weak)) void btstack_host_forget_device(const uint8_t bd_addr[6]) { (void)bd_addr; }
+__attribute__((weak)) void btstack_host_suppress_scan(bool suppress) { (void)suppress; }
+
+// flash_factory_reset (used by cdc_commands.c SETTINGS.RESET)
+__attribute__((weak)) void flash_factory_reset(void) {}
+
+// neopixel functions (ESP32 uses ws2812_esp32.c which may not have these)
+__attribute__((weak)) void neopixel_disable(void) {}
+__attribute__((weak)) void neopixel_set_pin(int8_t pin) { (void)pin; }
