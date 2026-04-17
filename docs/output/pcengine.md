@@ -30,6 +30,26 @@ Pin 7 is labeled **OE** (Output Enable) in some references and **CLR** (Clear) i
 
 See [PCEngine Protocol Reference](../protocols/PCENGINE.md) for wire-level details.
 
+### Voltage Levels
+
+The PCEngine controller port is **5V**. RP2040 boards (Pico, KB2040, etc.) are **3.3V** and their GPIOs are not 5V tolerant.
+
+**Output lines (D0-D3, adapter → console):** 3.3V output is above the PCEngine's TTL high threshold (~2.0V), so these work without level shifting.
+
+**Input lines (SEL, CLR/OE, console → adapter):** The console drives these at 5V. Connecting them directly to RP2040 GPIOs risks damaging the chip. Use a voltage divider on each input line:
+
+```
+Console (5V) ──[1kΩ]──┬── GPIO (3.3V safe)
+                       │
+                      [2kΩ]
+                       │
+                      GND
+```
+
+This drops 5V to ~3.3V. Use 1kΩ (top) + 2kΩ (bottom) for each of SEL and CLR/OE (2 dividers total, 4 resistors).
+
+Alternatively, a bidirectional level shifter module (BSS138-based or TXB0106) works but is overkill for these two slow input signals.
+
 ### GPIO Pins
 
 **KB2040 (default):**
