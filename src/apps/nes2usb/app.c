@@ -4,6 +4,7 @@
 #include "core/services/players/manager.h"
 #include "core/services/profiles/profile.h"
 #include "core/services/button/button.h"
+#include "core/services/leds/leds.h"
 #include "core/input_interface.h"
 #include "core/output_interface.h"
 #include "usb/usbd/usbd.h"

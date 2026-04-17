@@ -8,6 +8,7 @@
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
 #include "hardware/timer.h"
+#include <stdio.h>
 
 #define NES_BTN_INDEX_A       0
 #define NES_BTN_INDEX_B       1
