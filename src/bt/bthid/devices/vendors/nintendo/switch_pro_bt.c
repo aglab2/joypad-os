@@ -508,7 +508,7 @@ static void switch_disconnect(bthid_device_t* device)
 // ============================================================================
 
 const bthid_driver_t switch_pro_bt_driver = {
-    .name = "Nintendo Switch Pro (BT)",
+    .name = "Nintendo Switch Pro",
     .match = switch_match,
     .init = switch_init,
     .process_report = switch_process_report,

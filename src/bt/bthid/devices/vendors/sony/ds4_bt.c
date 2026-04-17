@@ -529,7 +529,7 @@ static void ds4_disconnect(bthid_device_t* device)
 // ============================================================================
 
 const bthid_driver_t ds4_bt_driver = {
-    .name = "Sony DualShock 4 (BT)",
+    .name = "Sony DualShock 4",
     .match = ds4_match,
     .init = ds4_init,
     .process_report = ds4_process_report,

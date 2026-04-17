@@ -329,7 +329,7 @@ static void xbox_disconnect(bthid_device_t* device)
 // ============================================================================
 
 const bthid_driver_t xbox_bt_driver = {
-    .name = "Xbox Wireless Controller (BT)",
+    .name = "Xbox Wireless Controller",
     .match = xbox_match,
     .init = xbox_init,
     .process_report = xbox_process_report,
