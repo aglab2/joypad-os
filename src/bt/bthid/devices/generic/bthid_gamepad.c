@@ -39,6 +39,7 @@ typedef struct {
     uint8_t report_id;          // Expected gamepad input report ID (0 = none)
     bool has_sim_triggers;      // true if triggers use Simulation Controls (Xbox-style)
     bool is_xbox;               // true if Microsoft VID (0x045E) — affects button map
+    bool is_8bitdo;             // true if 8BitDo VID (0x2DC8) — paddle button order
 } ble_report_map_t;
 
 // ============================================================================
@@ -112,8 +113,8 @@ static const uint32_t XBOX_SEQ_BUTTON_MAP[16] = {
     JP_BUTTON_A2,       // usage 15: Share (Series X/S)
 };
 
-// Standard sequential HID gamepads (8BitDo, generic controllers)
-// Button 1-12 map directly to face/shoulder/trigger/meta buttons
+// Standard sequential HID gamepads: shoulders before triggers
+// Used by most generic controllers
 static const uint32_t SEQ_BUTTON_MAP[16] = {
     0,                  // usage 0: invalid
     JP_BUTTON_B1,       // usage 1: face 1 (A/Cross)
@@ -131,6 +132,29 @@ static const uint32_t SEQ_BUTTON_MAP[16] = {
     JP_BUTTON_A1,       // usage 13: guide/home
     JP_BUTTON_A2,       // usage 14: capture/share
     JP_BUTTON_A3,       // usage 15: assistant/mute
+};
+
+// 8BitDo controllers with back paddles (Ultimate, Pro 2, etc.)
+// VID 0x2DC8. Descriptor order inserts R4 at 3 and L4 at 6:
+//   A B R4 X Y L4 LB RB LT RT Select Start L3 R3 Home Capture
+static const uint32_t BITDO_BUTTON_MAP[17] = {
+    0,                  // usage 0: invalid
+    JP_BUTTON_B1,       // usage 1: A
+    JP_BUTTON_B2,       // usage 2: B
+    JP_BUTTON_R4,       // usage 3: R4 (back paddle)
+    JP_BUTTON_B3,       // usage 4: X
+    JP_BUTTON_B4,       // usage 5: Y
+    JP_BUTTON_L4,       // usage 6: L4 (back paddle)
+    JP_BUTTON_L1,       // usage 7: LB
+    JP_BUTTON_R1,       // usage 8: RB
+    JP_BUTTON_L2,       // usage 9: LT (digital)
+    JP_BUTTON_R2,       // usage 10: RT (digital)
+    JP_BUTTON_S1,       // usage 11: Select
+    JP_BUTTON_S2,       // usage 12: Start
+    JP_BUTTON_A1,       // usage 13: Home
+    JP_BUTTON_L3,       // usage 14: L3
+    JP_BUTTON_R3,       // usage 15: R3
+    JP_BUTTON_A2,       // usage 16: Capture
 };
 
 // ============================================================================
@@ -316,14 +340,15 @@ void bthid_gamepad_set_descriptor(bthid_device_t* device, const uint8_t* desc, u
     }
 
     gp->map.is_xbox = (device->vendor_id == 0x045E);
+    gp->map.is_8bitdo = (device->vendor_id == 0x2DC8);
     gp->has_report_map = true;
-    printf("[BTHID_GAMEPAD] Parsed: %d btns, X@%d Y@%d Z@%d RZ@%d RX@%d RY@%d hat@%d(min=%d) sim=%d xbox=%d\n",
+    printf("[BTHID_GAMEPAD] Parsed: %d btns, X@%d Y@%d Z@%d RZ@%d RX@%d RY@%d hat@%d(min=%d) sim=%d xbox=%d 8bitdo=%d\n",
            btns_count,
            gp->map.xLoc.byteIndex, gp->map.yLoc.byteIndex,
            gp->map.zLoc.byteIndex, gp->map.rzLoc.byteIndex,
            gp->map.rxLoc.byteIndex, gp->map.ryLoc.byteIndex,
            gp->map.hatLoc.byteIndex, gp->map.hat_min, gp->map.has_sim_triggers,
-           gp->map.is_xbox);
+           gp->map.is_xbox, gp->map.is_8bitdo);
 }
 
 void bthid_gamepad_update_vid(bthid_device_t* device)
@@ -332,6 +357,7 @@ void bthid_gamepad_update_vid(bthid_device_t* device)
     if (!gp || !gp->has_report_map) return;
 
     gp->map.is_xbox = (device->vendor_id == 0x045E);
+    gp->map.is_8bitdo = (device->vendor_id == 0x2DC8);
 }
 
 // ============================================================================
@@ -399,6 +425,11 @@ static void process_report_dynamic(bthid_gamepad_data_t* gp, const uint8_t* data
         // Xbox Classic BT: sequential buttons (no gaps), different order
         btn_map = XBOX_SEQ_BUTTON_MAP;
         btn_map_size = sizeof(XBOX_SEQ_BUTTON_MAP) / sizeof(XBOX_SEQ_BUTTON_MAP[0]);
+    } else if (map->is_8bitdo && map->buttonCnt > 14) {
+        // 8BitDo with paddles (Ultimate, etc.): R4 at usage 3, L4 at usage 6
+        // Models without paddles (SN30 Pro, M30) have ≤14 buttons and use SEQ map
+        btn_map = BITDO_BUTTON_MAP;
+        btn_map_size = sizeof(BITDO_BUTTON_MAP) / sizeof(BITDO_BUTTON_MAP[0]);
     } else {
         btn_map = SEQ_BUTTON_MAP;
         btn_map_size = sizeof(SEQ_BUTTON_MAP) / sizeof(SEQ_BUTTON_MAP[0]);
