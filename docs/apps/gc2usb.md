@@ -8,7 +8,7 @@ Reads a native GameCube controller via the joybus single-wire protocol and outpu
 
 ## Input
 
-[GameCube Input](../input/gamecube.md) -- Joybus PIO protocol on GPIO 29, polled at 125Hz (native GC rate).
+[GameCube Input](../input/gamecube.md) -- Joybus PIO protocol on a single GPIO (pin varies by board, see Supported Boards), polled at 125Hz (native GC rate).
 
 ## Output
 
@@ -20,7 +20,7 @@ Reads a native GameCube controller via the joybus single-wire protocol and outpu
 |---------|-------|
 | Routing mode | SIMPLE (1:1) |
 | Player slots | 1 (fixed) |
-| Data pin | GPIO 29 |
+| Data pin | GPIO 29 (KB2040) / GPIO 2 (RP2040-Zero) / GPIO 28 (Pico) |
 | Profile system | 3 profiles |
 
 ## Profiles
@@ -62,13 +62,15 @@ Reads a native GameCube controller via the joybus single-wire protocol and outpu
 
 ## Supported Boards
 
-| Board | Build Command |
-|-------|---------------|
-| KB2040 | `make gc2usb_kb2040` |
+| Board | Data Pin | Build Command |
+|-------|----------|---------------|
+| KB2040 | GP29 | `make gc2usb_kb2040` |
+| RP2040-Zero | GP2 | `make gc2usb_rp2040zero` |
+| Raspberry Pi Pico | GP28 | `make gc2usb_pico` |
 
 ## Build and Flash
 
 ```bash
-make gc2usb_kb2040
+make gc2usb_kb2040       # or gc2usb_rp2040zero / gc2usb_pico
 make flash-gc2usb_kb2040
 ```

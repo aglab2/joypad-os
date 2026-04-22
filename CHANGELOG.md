@@ -56,6 +56,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - CYW43 onboard LED status patterns: blinking = scanning, solid = connected, off = idle
 - **gc2usb** — auto-calibrating stick range scaling (tracks min/max per axis, expands to full 0-255)
 - **gc2usb_rp2040zero** — new build target (GC data on GP2, NeoPixel on GP16)
+- **gc2usb_pico** — new build target for Raspberry Pi Pico (GC data on GP28; GP29 isn't broken out on standard Pico)
 - **Dual Nunchuck mode** — two I2C Nunchucks merged into one input (left stick + right stick, 4 face buttons)
 - **Batch flash tool** — `tools/flash-loop.sh` for flashing multiple boards in sequence
 - **8BitDo Ultimate BLE button mapping** — dedicated map for controllers with back paddles (VID 0x2DC8, >14 buttons)

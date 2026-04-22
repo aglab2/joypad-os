@@ -68,7 +68,7 @@ These apps read retro controllers directly and output as USB HID gamepads.
 |-----|-------|---------|--------|---------------|
 | `snes2usb` | SNES | SIMPLE | KB2040 | `make snes2usb_kb2040` |
 | `n642usb` | N64 | SIMPLE | KB2040 | `make n642usb_kb2040` |
-| `gc2usb` | GameCube | SIMPLE | KB2040 | `make gc2usb_kb2040` |
+| `gc2usb` | GameCube | SIMPLE | KB2040/RP2040-Zero/Pico | `make gc2usb_kb2040` (or `_rp2040zero` / `_pico`) |
 | `nes2usb` | NES | SIMPLE | KB2040 | `make nes2usb_kb2040` |
 | `neogeo2usb` | Neo Geo | SIMPLE | KB2040 | `make neogeo2usb_kb2040` |
 | `lodgenet2usb` | LodgeNet | SIMPLE | Pico | `make lodgenet2usb_pico` |

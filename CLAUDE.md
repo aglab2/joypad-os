@@ -82,7 +82,7 @@ Output: `releases/joypad_<commit>_<app>_<board>.uf2`
 | `wifi2usb` | Pico W/Pico 2 W | WiFi (JOCP) | USB HID |
 | `snes2usb` | KB2040 | SNES | USB HID |
 | `n642usb` | KB2040 | N64 | USB HID |
-| `gc2usb` | KB2040 | GameCube | USB HID |
+| `gc2usb` | KB2040/RP2040-Zero/Pico | GameCube | USB HID |
 | `lodgenet2usb` | Pico/Pico 2 | LodgeNet (N64/GC/SNES) | USB HID |
 | `n642dc` | KB2040 | N64 | Dreamcast |
 | `snes23do` | RP2040-Zero | SNES | 3DO |
