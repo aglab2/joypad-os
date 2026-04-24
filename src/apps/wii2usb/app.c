@@ -7,11 +7,14 @@
 #include "core/services/players/manager.h"
 #include "core/services/profiles/profile.h"
 #include "core/services/players/feedback.h"
+#include "core/services/button/button.h"
 #include "core/input_interface.h"
 #include "core/output_interface.h"
 #include "usb/usbd/usbd.h"
 #include "native/host/wii_ext/wii_ext_host.h"
 #include "core/services/leds/leds.h"
+#include "tusb.h"
+#include "platform/platform.h"
 #include <stdio.h>
 
 // ============================================================================
@@ -43,12 +46,46 @@ const OutputInterface** app_get_output_interfaces(uint8_t* count)
 }
 
 // ============================================================================
+// BUTTON (BOOTSEL) — USB output mode switching
+// ============================================================================
+
+static void on_button_event(button_event_t event)
+{
+    switch (event) {
+        case BUTTON_EVENT_DOUBLE_CLICK: {
+            // Cycle to next USB output mode (e.g. SInput → XInput → PS3 → ...).
+            printf("[app:wii2usb] Double-click — cycling USB output mode\n");
+            tud_task_ext(1, false);
+            platform_sleep_ms(50);
+            tud_task_ext(1, false);
+
+            usb_output_mode_t next = usbd_get_next_mode();
+            printf("[app:wii2usb] Switching to %s\n", usbd_get_mode_name(next));
+            usbd_set_mode(next);
+            break;
+        }
+        case BUTTON_EVENT_TRIPLE_CLICK:
+            // Reset to default HID gamepad mode (so CDC console comes back).
+            printf("[app:wii2usb] Triple-click — resetting to HID mode\n");
+            if (!usbd_reset_to_hid()) {
+                printf("[app:wii2usb] Already in HID mode\n");
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+// ============================================================================
 // APP INITIALIZATION
 // ============================================================================
 
 void app_init(void)
 {
     printf("[app:wii2usb] Initializing WII2USB v%s\n", APP_VERSION);
+
+    button_init();
+    button_set_callback(on_button_event);
 
 #if defined(WII_PIN_SDA2) && WII_PIN_SDA2 != 255
     wii_host_init_dual(WII_PIN_SDA, WII_PIN_SCL, WII_PIN_SDA2, WII_PIN_SCL2);
@@ -96,6 +133,8 @@ void app_init(void)
 
 void app_task(void)
 {
+    button_task();
+
     // Update LED color when USB output mode changes (mirrors snes2usb).
     static usb_output_mode_t last_led_mode = USB_OUTPUT_MODE_COUNT;
     usb_output_mode_t mode = usbd_get_mode();

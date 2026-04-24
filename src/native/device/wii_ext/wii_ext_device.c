@@ -9,6 +9,7 @@
 // 0xFB init-2, 0xFE mode select). We implement exactly that.
 
 #include "wii_ext_device.h"
+#include "wii_ext_crypto.h"
 #include "core/router/router.h"
 #include "core/input_event.h"
 #include "core/buttons.h"
@@ -17,6 +18,9 @@
 #include "platform/platform.h"
 #include "pico/i2c_slave.h"
 #include "hardware/gpio.h"
+#include "hardware/sync.h"
+#include "tusb.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,48 +39,44 @@ static wii_device_emulation_t emulation_kind = WII_DEV_EMULATE_CLASSIC;
 
 // ---- Calibration block ------------------------------------------------------
 
-// A valid Classic calibration with the `0x55`-seeded sum checksum that
-// real Wiimotes validate. Values chosen to give centered sticks and
-// reasonable ranges — these are close to OEM factory defaults.
+// Calibration block (16 bytes at reg 0x20, mirrored at 0x30). Values are
+// in 8-bit scale matching Dolphin's emulated Classic Controller:
+//   CAL_STICK_CENTER 0x80, STICK_GATE_RADIUS 0x61
+//   → max = 0xE1, min = 0x1F, center = 0x80 (per stick axis)
+// Checksum format (per Dolphin's UpdateCalibrationDataChecksum):
+//   byte 14 = (sum of bytes 0..13 + 0x55) & 0xFF
+//   byte 15 = (byte 14 + 0x55) & 0xFF
+// Both bytes are 8-bit; the 2nd is the 1st plus 0x55. The Wii System
+// Menu verifies this checksum and falls back to internal defaults if
+// it's wrong, which manifests as analog axes mapping incorrectly even
+// though buttons work normally.
 static void seed_calibration(void)
 {
-    // 14 bytes of calibration, then 2-byte sum checksum (seed = 0x55).
-    // Layout follows wiibrew's Classic calibration block:
-    //   LX max, LX min, LX center,
-    //   LY max, LY min, LY center,
-    //   RX max, RX min, RX center,
-    //   RY max, RY min, RY center,
-    //   LT neutral,  RT neutral,
-    //   checksum MSB, checksum LSB
-    uint8_t cal[16];
-    cal[0]  = 0x3F;  // LX max
-    cal[1]  = 0x00;  // LX min
-    cal[2]  = 0x20;  // LX center
-    cal[3]  = 0x3F;  // LY max
-    cal[4]  = 0x00;  // LY min
-    cal[5]  = 0x20;  // LY center
-    cal[6]  = 0x1F;  // RX max
-    cal[7]  = 0x00;  // RX min
-    cal[8]  = 0x10;  // RX center
-    cal[9]  = 0x1F;  // RY max
-    cal[10] = 0x00;  // RY min
-    cal[11] = 0x10;  // RY center
-    cal[12] = 0x00;  // LT neutral
-    cal[13] = 0x00;  // RT neutral
-
-    uint16_t sum = 0x55 + 0x55;
-    for (int i = 0; i < 14; i++) sum += cal[i];
-    cal[14] = (uint8_t)((sum >> 8) & 0xFF);
-    cal[15] = (uint8_t)(sum & 0xFF);
+    uint8_t cal[16] = {
+        0xE1, 0x1F, 0x80,  // LX max, min, center
+        0xE1, 0x1F, 0x80,  // LY
+        0xE1, 0x1F, 0x80,  // RX
+        0xE1, 0x1F, 0x80,  // RY
+        0x00, 0x00,        // LT, RT neutral
+        0x00, 0x00,        // checksum (filled below)
+    };
+    uint8_t checksum = 0x55;
+    for (int i = 0; i < 14; i++) checksum += cal[i];
+    cal[14] = checksum;
+    cal[15] = (uint8_t)(checksum + 0x55);
 
     memcpy((void *)&reg_file[0x20], cal, 16);
-    memcpy((void *)&reg_file[0x30], cal, 16);  // mirror — hardware does it
+    memcpy((void *)&reg_file[0x30], cal, 16);  // mirror
 }
 
 static void seed_id_bytes(wii_device_emulation_t k)
 {
     // [2][3] are the always-0xA4 0x20 "Wii extension" sanity prefix.
-    // [4] is the data-type/mode byte (1 = 6-byte format).
+    // [4] is the data-type/mode byte — REFLECTS THE CURRENT REPORT FORMAT,
+    // not a fixed "Pro magic". Real Classic Pro at rest reports id[4]=0x01
+    // (format 1, default). The host writes 0x03 to 0xFE to switch to
+    // format 3, and at that point id[4] becomes 0x03. We mirror this
+    // behavior — default to 0x01, update on FE write.
     // [5] is the family selector (00=Nunchuck, 01=Classic, 03=Guitar...).
     // [0] distinguishes within a family (Classic Pro reports 0x01).
     uint8_t id[6];
@@ -84,102 +84,86 @@ static void seed_id_bytes(wii_device_emulation_t k)
     id[3] = 0x20;
     id[4] = 0x01;
     switch (k) {
-        case WII_DEV_EMULATE_CLASSIC:     id[0] = 0x00; id[5] = 0x01; break;
-        case WII_DEV_EMULATE_CLASSIC_PRO: id[0] = 0x01; id[5] = 0x01; break;
-        case WII_DEV_EMULATE_NUNCHUCK:    id[0] = 0x00; id[4] = 0x00;
-                                          id[5] = 0x00; break;
+        case WII_DEV_EMULATE_CLASSIC:
+            id[0] = 0x00; id[5] = 0x01;
+            break;
+        case WII_DEV_EMULATE_CLASSIC_PRO:
+            id[0] = 0x01; id[5] = 0x01;
+            break;
+        case WII_DEV_EMULATE_NUNCHUCK:
+            id[0] = 0x00; id[4] = 0x00; id[5] = 0x00;
+            break;
     }
     id[1] = 0x00;
     memcpy((void *)&reg_file[0xFA], id, 6);
 }
 
-// Initial 6-byte report — neutral sticks / no buttons pressed / report
-// mode 1. Updated live from the router tap callback.
+// Seed format 0x01 (6-byte) rest pattern. Sticks centered, triggers off,
+// no buttons pressed. Encryption (if negotiated) wraps this in the read
+// handler — the register file itself stays plaintext.
 static void seed_neutral_report(void)
 {
-    // Neutral sticks: LX/LY center = 0x20, RX/RY center = 0x10.
-    // Classic report format 1 (6 bytes, active-low buttons):
-    //   [0] RX_high2 << 6 | LX[5:0]
-    //   [1] RX_mid2  << 6 | LY[5:0]
-    //   [2] RX_low1  << 7 | LT[4:3] << 5 | RY[4:0]
-    //   [3] LT[2:0]  << 5 | RT[4:0]
-    //   [4] 0xFF (all bits = not-pressed)
-    //   [5] 0xFF
-    // Pack neutral sticks using same logic as pack_report_from_event
-    // LX=32(0x20), LY=32(0x20), RX=16(0x10), RY=16(0x10), LT=RT=0
-    uint8_t lx = 0x20, ly = 0x20, rx = 0x10, ry = 0x10;
-    reg_file[0x00] = (uint8_t)((rx & 0x18) << 3) | (lx & 0x3F);
-    reg_file[0x01] = (uint8_t)((rx & 0x06) << 5) | (ly & 0x3F);
-    reg_file[0x02] = (uint8_t)((rx & 0x01) << 7) | (ry & 0x1F);
-    reg_file[0x03] = 0x00;  // LT=RT=0
-    reg_file[0x04] = 0xFF;  // all buttons released
+    reg_file[0x00] = 0xA0;  // RX<4:3>=10, LX=0x20
+    reg_file[0x01] = 0x20;  // RX<2:1>=00, LY=0x20
+    reg_file[0x02] = 0x10;  // RX<0>=0, LT<4:3>=0, RY=0x10
+    reg_file[0x03] = 0x00;  // LT<2:0>=0, RT=0
+    reg_file[0x04] = 0xFF;  // buttons unpressed
     reg_file[0x05] = 0xFF;
-    // Report mode register.
     reg_file[0xFE] = 0x01;
+
+    static const uint8_t init7d[6] = { 0x00, 0x80, 0x14, 0x82, 0x00, 0x08 };
+    memcpy((void *)&reg_file[0x7D], init7d, sizeof(init7d));
 }
 
-// ---- Event → 6-byte report packer (inverse of ext_classic.c parser) --------
+// ---- Event → report packer (format 0x01) -----------------------------------
 
 static void pack_report_from_event(const input_event_t *ev)
 {
-    // Stick / trigger down-shifts:
-    // Our internal format: 0..255 with 128 center for sticks, 0..255 for triggers.
-    // Wii Classic format: LX/LY = 6-bit (0..63, ~32 center),
-    //                     RX/RY = 5-bit (0..31, ~16 center),
-    //                     LT/RT = 5-bit (0..31, 0 = released).
-    // Scale 0-255 → 6-bit (LX/LY) or 5-bit (RX/RY)
-    // Y inversion: HID 0=up → Classic 63=up. Center 128→32 (LX/LY) or 16 (RX/RY).
-    uint8_t lx = ev->analog[ANALOG_LX] >> 2;
-    uint8_t ly = (255 - ev->analog[ANALOG_LY]) >> 2;
-    uint8_t rx = ev->analog[ANALOG_RX] >> 3;
-    uint8_t ry = (255 - ev->analog[ANALOG_RY]) >> 3;
+    // Buttons — active-LOW: 1 = unpressed, 0 = pressed.
+    uint8_t btn_lo = 0xFF, btn_hi = 0xFF;
+    uint32_t btn = ev->buttons;
+    if (btn & JP_BUTTON_DR) btn_lo &= ~(1u << 7);
+    if (btn & JP_BUTTON_DD) btn_lo &= ~(1u << 6);
+    if (btn & JP_BUTTON_L1) btn_lo &= ~(1u << 5);
+    if (btn & JP_BUTTON_S1) btn_lo &= ~(1u << 4);
+    if (btn & JP_BUTTON_A1) btn_lo &= ~(1u << 3);
+    if (btn & JP_BUTTON_S2) btn_lo &= ~(1u << 2);
+    if (btn & JP_BUTTON_R1) btn_lo &= ~(1u << 1);
+    if (btn & JP_BUTTON_L2) btn_hi &= ~(1u << 7);
+    if (btn & JP_BUTTON_B1) btn_hi &= ~(1u << 6);
+    if (btn & JP_BUTTON_B3) btn_hi &= ~(1u << 5);
+    if (btn & JP_BUTTON_B2) btn_hi &= ~(1u << 4);
+    if (btn & JP_BUTTON_B4) btn_hi &= ~(1u << 3);
+    if (btn & JP_BUTTON_R2) btn_hi &= ~(1u << 2);
+    if (btn & JP_BUTTON_DL) btn_hi &= ~(1u << 1);
+    if (btn & JP_BUTTON_DU) btn_hi &= ~(1u << 0);
+
+    // Format 0x01: 6-bit LX/LY + 5-bit RX/RY + 5-bit triggers. The Wii
+    // upscales 6-bit values ×4 to compare against the 8-bit cal block,
+    // so report values must stay inside (cal_min/4 .. cal_max/4) =
+    // (7.75 .. 56.25) — i.e. 8..56 inclusive. Values below cal_min/4
+    // make the Wii System Menu's axis math mis-map (wrong direction).
+    // Y axes: CC convention is 0=down, 255=up — invert HID Y first.
+    uint8_t lx = (uint8_t)(8 + ((uint16_t)ev->analog[ANALOG_LX] * 48 / 255));
+    uint8_t ly = (uint8_t)(8 + ((uint16_t)(255 - ev->analog[ANALOG_LY]) * 48 / 255));
+    uint8_t rx = (uint8_t)(4 + ((uint16_t)ev->analog[ANALOG_RX] * 24 / 255));
+    uint8_t ry = (uint8_t)(4 + ((uint16_t)(255 - ev->analog[ANALOG_RY]) * 24 / 255));
     uint8_t lt = ev->analog[ANALOG_L2] >> 3;
     uint8_t rt = ev->analog[ANALOG_R2] >> 3;
-
-    if (lx > 0x3F) lx = 0x3F;
-    if (ly > 0x3F) ly = 0x3F;
-    if (rx > 0x1F) rx = 0x1F;
-    if (ry > 0x1F) ry = 0x1F;
-    if (lt > 0x1F) lt = 0x1F;
-    if (rt > 0x1F) rt = 0x1F;
 
     uint8_t b0 = (uint8_t)((rx & 0x18) << 3) | (lx & 0x3F);
     uint8_t b1 = (uint8_t)((rx & 0x06) << 5) | (ly & 0x3F);
     uint8_t b2 = (uint8_t)((rx & 0x01) << 7) | (uint8_t)((lt & 0x18) << 2) | (ry & 0x1F);
     uint8_t b3 = (uint8_t)((lt & 0x07) << 5) | (rt & 0x1F);
 
-    // Buttons: active-LOW in bytes 4 and 5. Start with all bits set (no
-    // button pressed) and clear per pressed button.
-    uint8_t b4 = 0xFF;
-    uint8_t b5 = 0xFF;
-    uint32_t btn = ev->buttons;
-    if (btn & JP_BUTTON_DR) b4 &= ~(1u << 7);
-    if (btn & JP_BUTTON_DD) b4 &= ~(1u << 6);
-    if (btn & JP_BUTTON_L1) b4 &= ~(1u << 5);
-    if (btn & JP_BUTTON_S1) b4 &= ~(1u << 4);
-    if (btn & JP_BUTTON_A1) b4 &= ~(1u << 3);
-    if (btn & JP_BUTTON_S2) b4 &= ~(1u << 2);
-    if (btn & JP_BUTTON_R1) b4 &= ~(1u << 1);
-
-    if (btn & JP_BUTTON_L2) b5 &= ~(1u << 7);  // ZL
-    if (btn & JP_BUTTON_B1) b5 &= ~(1u << 6);  // south = Wii B
-    if (btn & JP_BUTTON_B3) b5 &= ~(1u << 5);  // west  = Wii Y
-    if (btn & JP_BUTTON_B2) b5 &= ~(1u << 4);  // east  = Wii A
-    if (btn & JP_BUTTON_B4) b5 &= ~(1u << 3);  // north = Wii X
-    if (btn & JP_BUTTON_R2) b5 &= ~(1u << 2);  // ZR
-    if (btn & JP_BUTTON_DL) b5 &= ~(1u << 1);
-    if (btn & JP_BUTTON_DU) b5 &= ~(1u << 0);
-
-    // Atomic-ish update: I2C ISR reads these bytes on the next Wiimote
-    // poll. On a 32-bit ARM the individual byte writes are atomic, so
-    // we at worst tear between two neighbouring fields. Acceptable for
-    // 100 Hz poll rate — next poll picks up the coherent value.
+    uint32_t irq_state = save_and_disable_interrupts();
     reg_file[0x00] = b0;
     reg_file[0x01] = b1;
     reg_file[0x02] = b2;
     reg_file[0x03] = b3;
-    reg_file[0x04] = b4;
-    reg_file[0x05] = b5;
+    reg_file[0x04] = btn_lo;
+    reg_file[0x05] = btn_hi;
+    restore_interrupts(irq_state);
 }
 
 // ---- Router tap: called for every input event routed to OUTPUT_TARGET_WII_EXTENSION --
@@ -190,6 +174,49 @@ static void wii_device_router_tap(output_target_t output, uint8_t player_index,
     (void)output;
     (void)player_index;
     if (event) pack_report_from_event(event);
+}
+
+// ---- Debug log (ring buffer; drained from task, never printed in ISR) ------
+
+typedef struct {
+    uint8_t kind;  // 'A'=addr seek, 'W'=write, 'R'=first read of transaction
+    uint8_t reg;
+    uint8_t val;
+} wii_log_event_t;
+
+#define WII_LOG_BUF_SIZE 256
+static volatile wii_log_event_t wii_log_buf[WII_LOG_BUF_SIZE];
+static volatile uint16_t wii_log_head = 0;
+static volatile uint16_t wii_log_tail = 0;
+static volatile uint16_t wii_log_dropped = 0;
+static volatile bool    tx_first_read = true;
+
+static inline void wii_log_push(uint8_t kind, uint8_t reg, uint8_t val) {
+    uint16_t next = (uint16_t)((wii_log_head + 1) % WII_LOG_BUF_SIZE);
+    if (next == wii_log_tail) {
+        wii_log_dropped++;
+        return;
+    }
+    wii_log_buf[wii_log_head].kind = kind;
+    wii_log_buf[wii_log_head].reg  = reg;
+    wii_log_buf[wii_log_head].val  = val;
+    wii_log_head = next;
+}
+
+static void wii_log_drain(void) {
+    while (wii_log_tail != wii_log_head) {
+        wii_log_event_t e = wii_log_buf[wii_log_tail];
+        wii_log_tail = (uint16_t)((wii_log_tail + 1) % WII_LOG_BUF_SIZE);
+        switch (e.kind) {
+            case 'A': printf("[wii_ext] seek 0x%02X\n", e.reg); break;
+            case 'W': printf("[wii_ext] W 0x%02X = 0x%02X\n", e.reg, e.val); break;
+            case 'R': printf("[wii_ext] R 0x%02X = 0x%02X\n", e.reg, e.val); break;
+        }
+    }
+    if (wii_log_dropped) {
+        printf("[wii_ext] dropped %u log events\n", (unsigned)wii_log_dropped);
+        wii_log_dropped = 0;
+    }
 }
 
 // ---- I2C slave IRQ handler --------------------------------------------------
@@ -206,24 +233,63 @@ static void __isr wii_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t ev)
             if (!addr_received) {
                 cursor = b;
                 addr_received = true;
+                // Suppress the very common 0x00 data-poll seek so init reads
+                // (0x20, 0x30, 0xFA, 0xFE, ...) are visible in the log.
+                if (b != 0x00) wii_log_push('A', b, 0);
             } else {
-                if (cursor < REG_FILE_SIZE) {
-                    reg_file[cursor] = b;
+                // Decrypt incoming write IF encryption is on — but skip
+                // the decrypt for control registers (0xF0, 0xFB, 0xFE),
+                // which the Wii always sends in plaintext for protocol
+                // negotiation. This lets a new session reset stale
+                // encryption state from a previous session: when 0x55
+                // arrives at 0xF0, we recognize it raw and disable.
+                bool is_control_reg = (cursor == 0xF0 || cursor == 0xFB ||
+                                       cursor == 0xFE);
+                uint8_t store_b = b;
+                if (wii_ext_crypto_enabled && !is_control_reg) {
+                    wii_ext_crypto_decrypt(&store_b, (uint8_t)cursor, 1);
                 }
-                // TODO: implement XOR encryption when reg[0xF0]=0xAA
-                // (see issue #129 — needed for real Wii compatibility)
+                if (cursor < REG_FILE_SIZE) {
+                    reg_file[cursor] = store_b;
+                }
+                wii_log_push('W', (uint8_t)cursor, store_b);
+                // Encryption negotiation. Both 0x55 and 0xAA writes to 0xF0
+                // disable encryption — the Wiimote then sends a fresh
+                // 16-byte key in plaintext to 0x40-0x4F, and we re-init
+                // the cipher when the last key byte (0x4F) lands.
+                if (cursor == 0xF0) {
+                    if (store_b == 0x55 || store_b == 0xAA) {
+                        wii_ext_crypto_enabled = false;
+                    }
+                } else if (cursor == 0x4F && reg_file[0xF0] == 0xAA) {
+                    wii_ext_crypto_init(&reg_file[0x40]);
+                } else if (cursor == 0xFE) {
+                    // Format-mode switch — mirror into id[4] (0xFE register
+                    // and ID byte 4 must agree per real-CC behavior).
+                    reg_file[0xFE] = store_b;
+                    reg_file[0xFA + 4] = store_b;
+                }
                 cursor = (uint16_t)(cursor + 1) % REG_FILE_SIZE;
             }
             break;
         }
         case I2C_SLAVE_REQUEST: {
-            // Master wants to read. Push one byte at a time (slave FIFO
-            // is a few bytes deep; Wiimote pulls one at a time).
+            // Master wants to read. Encrypt if encryption is active.
+            uint8_t out_byte;
             if (cursor < REG_FILE_SIZE) {
-                i2c_write_byte_raw(i2c, reg_file[cursor]);
+                out_byte = reg_file[cursor];
+                if (wii_ext_crypto_enabled) {
+                    wii_ext_crypto_encrypt(&out_byte, (uint8_t)cursor, 1);
+                }
             } else {
-                i2c_write_byte_raw(i2c, 0xFF);
+                out_byte = 0xFF;
             }
+            // Log the first byte of each read transaction (skip 0x00 polls).
+            if (tx_first_read && cursor != 0x00) {
+                wii_log_push('R', (uint8_t)cursor, out_byte);
+            }
+            tx_first_read = false;
+            i2c_write_byte_raw(i2c, out_byte);
             cursor = (uint16_t)(cursor + 1) % REG_FILE_SIZE;
             break;
         }
@@ -234,6 +300,7 @@ static void __isr wii_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t ev)
             // left off — real Wii extensions auto-increment across
             // back-to-back reads, and some games depend on it.
             addr_received = false;
+            tx_first_read = true;
             break;
     }
 }
@@ -317,7 +384,16 @@ static void wii_device_out_init(void) {
 }
 
 static void wii_device_out_task(void) {
-    // No periodic work; updates flow via the router tap.
+    wii_log_drain();
+
+    // Run cipher self-test from task context (non-ISR) once encryption
+    // has been activated by a real Wii init. Avoids the CDC-TX-FIFO
+    // overflow we get when printing from the I2C ISR.
+    static bool selftest_done = false;
+    if (!selftest_done && wii_ext_crypto_enabled) {
+        selftest_done = true;
+        wii_ext_crypto_self_test();
+    }
 }
 
 const OutputInterface wii_output_interface = {

@@ -1291,9 +1291,9 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     # --- BT to Wii extension (Pico W built-in BT -> I2C slave at 0x52) ---
     # A real Wiimote plugs into the Pico's I2C bus and sees a Classic
     # Controller responding to its polls, driven by any BT controller.
-    add_executable(joypad_bt2wii)
-    target_compile_definitions(joypad_bt2wii PRIVATE
-        CONFIG_BT2WII=1
+    add_executable(joypad_bt2wiiext)
+    target_compile_definitions(joypad_bt2wiiext PRIVATE
+        CONFIG_BT2WIIEXT=1
         DISABLE_USB_HOST=1
         CONFIG_NO_NEOPIXEL=1
         CONFIG_PAD_INPUT=1
@@ -1304,7 +1304,7 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
         BTSTACK_USE_CYW43=1
         ENABLE_BTSTACK=1
     )
-    target_sources(joypad_bt2wii PUBLIC
+    target_sources(joypad_bt2wiiext PUBLIC
         ${CORE_SOURCES}
         ${USB_DEVICE_SOURCES}
         ${CONTROLLER_SOURCES}
@@ -1315,10 +1315,11 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
         ${CMAKE_CURRENT_SOURCE_DIR}/bt/transport/bt_transport.c
         ${CMAKE_CURRENT_SOURCE_DIR}/bt/transport/bt_transport_cyw43.c
         ${CMAKE_CURRENT_SOURCE_DIR}/native/device/wii_ext/wii_ext_device.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/apps/bt2wii/app.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/native/device/wii_ext/wii_ext_crypto.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/apps/bt2wiiext/app.c
     )
-    target_include_directories(joypad_bt2wii PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/apps/bt2wii
+    target_include_directories(joypad_bt2wiiext PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/apps/bt2wiiext
         ${CMAKE_CURRENT_SOURCE_DIR}/native/device/wii_ext
         ${CMAKE_CURRENT_SOURCE_DIR}/usb/usbd
         ${CMAKE_CURRENT_SOURCE_DIR}/pad
@@ -1327,7 +1328,7 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
         ${CMAKE_CURRENT_SOURCE_DIR}/bt/bthid
         ${BTSTACK_INCLUDES}
     )
-    target_link_libraries(joypad_bt2wii PRIVATE
+    target_link_libraries(joypad_bt2wiiext PRIVATE
         pico_stdlib
         pico_multicore
         pico_rand
@@ -1345,9 +1346,9 @@ if (PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
         tinyusb_device
         tinyusb_board
     )
-    joypad_target_common(joypad_bt2wii)
-    pico_enable_stdio_usb(joypad_bt2wii 0)
-    pico_enable_stdio_uart(joypad_bt2wii 0)
+    joypad_target_common(joypad_bt2wiiext)
+    pico_enable_stdio_usb(joypad_bt2wiiext 0)
+    pico_enable_stdio_uart(joypad_bt2wiiext 0)
 
     # --- BT to GameCube (Pico W / Pico 2 W built-in Bluetooth -> GameCube) ---
     add_executable(joypad_bt2gc)
@@ -1860,6 +1861,7 @@ target_compile_definitions(joypad_wii2usb PRIVATE CONFIG_WII2USB=1 CONFIG_USB=1 
     PICO_DEFAULT_UART=0
     PICO_DEFAULT_UART_TX_PIN=0
     PICO_DEFAULT_UART_RX_PIN=1
+    USE_BOOTSEL_BUTTON=1
 )
 target_sources(joypad_wii2usb PUBLIC ${CORE_SOURCES} ${USB_DEVICE_SOURCES}
     ${WII_HOST_SOURCES}

@@ -142,7 +142,7 @@
 // USB DEVICE CONFIGURATION (CONFIG_USB or DISABLE_USB_HOST builds)
 //--------------------------------------------------------------------
 
-#if defined(CONFIG_USB) || defined(DISABLE_USB_HOST) || defined(CONFIG_NGC) || defined(CONFIG_BT2WII)
+#if defined(CONFIG_USB) || defined(DISABLE_USB_HOST) || defined(CONFIG_NGC) || defined(CONFIG_BT2WIIEXT)
   // Device configuration
   #define CFG_TUD_ENDPOINT0_SIZE    64
 

@@ -148,10 +148,12 @@ static void read_calibration(wii_ext_t *ext) {
     if (seek_read(ext, 0x20, ext->calib_raw, sizeof ext->calib_raw) != 0) {
         return;
     }
-    uint16_t sum = 0x55 + 0x55;
-    for (int i = 0; i < 14; i++) sum += ext->calib_raw[i];
-    uint16_t stored = ((uint16_t)ext->calib_raw[14] << 8) | ext->calib_raw[15];
-    ext->calib_valid = (sum == stored);
+    // Dolphin/real-CC checksum: byte 14 = sum_of_0..13 + 0x55 (8-bit
+    // wraparound); byte 15 = byte 14 + 0x55. NOT a 16-bit BE sum.
+    uint8_t checksum = 0x55;
+    for (int i = 0; i < 14; i++) checksum += ext->calib_raw[i];
+    ext->calib_valid = (ext->calib_raw[14] == checksum) &&
+                       (ext->calib_raw[15] == (uint8_t)(checksum + 0x55));
 }
 
 void wii_ext_attach(wii_ext_t *ext, const wii_ext_transport_t *io) {
@@ -171,7 +173,7 @@ void wii_ext_mark_disconnected(wii_ext_t *ext) {
 bool wii_ext_start(wii_ext_t *ext) {
     wii_ext_mark_disconnected(ext);
 
-    // Phase-tagged returns so the host adapter can tell the user which step
+    // Phase-tagged returns so the host adapter can report which init step
     // failed (address-NACK at F0=55, ID read, classification, etc.).
     extern int printf(const char *, ...);
     if (unencrypted_init(ext) != 0) {
@@ -193,6 +195,16 @@ bool wii_ext_start(wii_ext_t *ext) {
     }
 
     read_calibration(ext);
+
+    // Debug dump — full raw cal block + ID, captured the first time a real
+    // extension responds. Useful for comparing against an emulator's output.
+    printf("[wii_ext] RAW ID  : %02X %02X %02X %02X %02X %02X\n",
+           ext->id[0], ext->id[1], ext->id[2],
+           ext->id[3], ext->id[4], ext->id[5]);
+    printf("[wii_ext] RAW CAL : ");
+    for (int i = 0; i < 16; i++) printf("%02X ", ext->calib_raw[i]);
+    printf("(checksum %s)\n", ext->calib_valid ? "VALID" : "INVALID");
+
     ext->ready = true;
     ext->first_read = true;
     return true;
@@ -214,6 +226,22 @@ bool wii_ext_poll(wii_ext_t *ext, wii_ext_state_t *out) {
         out->connected = false;
         out->type = WII_EXT_TYPE_NONE;
         return false;
+    }
+
+    // Debug: dump raw report bytes ~2x/sec, only when the report differs
+    // from the last dumped one — useful for capturing exact byte values
+    // at known stick positions to compare against an emulator's output.
+    static uint32_t last_dump_ms = 0;
+    static uint8_t  last_report[9] = {0};
+    extern uint32_t platform_time_ms(void);
+    extern int printf(const char *, ...);
+    uint32_t now_ms = platform_time_ms();
+    if (now_ms - last_dump_ms > 500 && memcmp(report, last_report, len) != 0) {
+        last_dump_ms = now_ms;
+        memcpy(last_report, report, len);
+        printf("[wii_ext] RAW RPT : ");
+        for (int i = 0; i < len; i++) printf("%02X ", report[i]);
+        printf("\n");
     }
 
     // Prime the chip's auto-increment register pointer for the next read.

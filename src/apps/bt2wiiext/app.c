@@ -1,4 +1,4 @@
-// app.c - BT2WII App Entry Point
+// app.c - BT2WIIEXT App Entry Point
 // BT input → Wii extension-port I2C slave output on Pico W.
 
 #include "app.h"
@@ -8,6 +8,7 @@
 #include "core/input_interface.h"
 #include "core/output_interface.h"
 #include "native/device/wii_ext/wii_ext_device.h"
+#include "native/device/wii_ext/wii_ext_crypto.h"
 #include "usb/usbd/usbd.h"
 #include "core/services/storage/flash.h"
 #include "bt/transport/bt_transport.h"
@@ -111,20 +112,15 @@ static void on_button_event(button_event_t event)
 
 void app_init(void)
 {
-    printf("[app:bt2wiiext] Initializing BT2WII v%s\n", APP_VERSION);
+    printf("[app:bt2wiiext] Initializing BT2WIIEXT v%s\n", APP_VERSION);
 
     // Expose Wii output for web config (pin/mode config via OUTPUT.NATIVE.GET/SET)
     native_output = &wii_output_interface;
 
-    // Determine emulation mode from flash (0=default/classic, 1=classic, 2=classic_pro, 3=nunchuck)
-    wii_device_emulation_t emu = WII_DEV_EMULATE_CLASSIC;
-    {
-        flash_t flash_data;
-        if (flash_load(&flash_data) && flash_data.wii_mode > 0) {
-            emu = (wii_device_emulation_t)(flash_data.wii_mode - 1);
-            if (emu > WII_DEV_EMULATE_NUNCHUCK) emu = WII_DEV_EMULATE_CLASSIC;
-        }
-    }
+    // Force Classic Controller Pro emulation. Pro reports the same 6-byte
+    // format-0x01 layout as a regular Classic but advertises id[0]=0x01
+    // so the Wii recognises it as the Pro variant. Flash override bypassed.
+    wii_device_emulation_t emu = WII_DEV_EMULATE_CLASSIC_PRO;
 
     // I2C slave up first so a plugged-in Wiimote gets a valid register
     // file immediately — even before the router and BT stack come up
@@ -190,6 +186,7 @@ void app_task(void)
     // Reboot-to-bootloader escape hatch on the CDC console.
     int c = getchar_timeout_us(0);
     if (c == 'B') reset_usb_boot(0, 0);
+    if (c == 'T') wii_ext_crypto_self_test();
 
     // Deferred BT init runs once — CYW43 must always initialize (Pico W
     // needs it), but scanning only starts if BT host is enabled.

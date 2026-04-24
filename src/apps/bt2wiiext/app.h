@@ -1,4 +1,4 @@
-// app.h - BT2WII App Manifest
+// app.h - BT2WIIEXT App Manifest
 // Bluetooth controllers → Wii extension-port emulation on Pico W.
 //
 // A real Wiimote plugs into the microcontroller's I2C bus (extension
