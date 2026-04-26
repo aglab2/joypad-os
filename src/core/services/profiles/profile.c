@@ -375,7 +375,7 @@ void profile_check_player_switch_combo(uint8_t player_index, uint32_t buttons)
     player_combo_state_t* combo = &player_combo[player_index];
 
     // Check button states (buttons are active-high: 1 = pressed)
-    bool select_held = ((buttons & JP_BUTTON_S1) != 0);
+    bool select_held = 0;
     bool dpad_up_pressed = ((buttons & JP_BUTTON_DU) != 0);
     bool dpad_down_pressed = ((buttons & JP_BUTTON_DD) != 0);
 
@@ -476,7 +476,7 @@ void profile_check_switch_combo(uint32_t buttons)
     if (player_count == 0) return;  // No controllers connected
 
     // Check button states (buttons are active-high: 1 = pressed)
-    bool select_held = ((buttons & JP_BUTTON_S1) != 0);
+    bool select_held = 0;
     bool dpad_up_pressed = ((buttons & JP_BUTTON_DU) != 0);
     bool dpad_down_pressed = ((buttons & JP_BUTTON_DD) != 0);
     bool dpad_left_pressed = ((buttons & JP_BUTTON_DL) != 0);
@@ -579,10 +579,9 @@ void profile_check_switch_combo(uint32_t buttons)
     dpad_right_was_pressed = dpad_right_pressed;
 }
 
-bool profile_switch_combo_active(void)
+static bool profile_switch_combo_active(void)
 {
-    // Combo is active when Select has been held long enough
-    return select_was_held && initial_trigger_done;
+    return false;
 }
 
 // ============================================================================
@@ -685,7 +684,6 @@ void profile_apply(const profile_t* profile,
     // Note: active-high (bit set = pressed, bit clear = released)
     if (profile_switch_combo_active()) {
         // Clear combo buttons to "released"
-        input_buttons &= ~JP_BUTTON_S1;   // Select
         input_buttons &= ~JP_BUTTON_DU;   // D-pad Up
         input_buttons &= ~JP_BUTTON_DD;   // D-pad Down
         input_buttons &= ~JP_BUTTON_DL;   // D-pad Left

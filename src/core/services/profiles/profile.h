@@ -300,10 +300,6 @@ void profile_set_output_mode_callback(output_mode_callback_t callback);
 // Uses primary output target for switching
 void profile_check_switch_combo(uint32_t buttons);
 
-// Check if profile switch combo is currently active
-// When true, caller should suppress Select + D-pad from output
-bool profile_switch_combo_active(void);
-
 // Load/save profile index from flash
 uint8_t profile_load_from_flash(output_target_t output, uint8_t default_index);
 void profile_save_to_flash(output_target_t output);

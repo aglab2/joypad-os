@@ -38,7 +38,7 @@ static const button_map_entry_t gc_default_map[] = {
 
     // System
     MAP_BUTTON(JP_BUTTON_S2, GC_BUTTON_START),  // Start → Start
-    MAP_DISABLED(JP_BUTTON_S1),                  // Select → nothing (profile switch)
+    MAP_BUTTON(JP_BUTTON_S1, GC_BUTTON_L | GC_BUTTON_R),      // R1/RB → Z
 };
 
 static const profile_t gc_profile_default = {
