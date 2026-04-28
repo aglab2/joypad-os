@@ -80,6 +80,7 @@ static void cyw43_led_update(int devices)
 #if defined(OLED_I2C_INST) || defined(OLED_I2C_DISPLAY)
 #include "core/services/display/display.h"
 #include "core/services/display/joy_anim.h"
+#include "core/services/display/eyes_anim.h"
 #ifdef OLED_I2C_INST
 #include "hardware/gpio.h"
 #endif
@@ -116,14 +117,21 @@ static const button_name_t button_names[] = {
     { JP_BUTTON_A2, "A2" },
     { 0, NULL }
 };
-// Display pages (paged with FeatherWing buttons A/C)
+// Display pages (paged with FeatherWing buttons A/C).
+// Order is intentional: page-up/down cycles in this order.
 typedef enum {
-    OLED_PAGE_JOY = 0,      // Joy animated character
-    OLED_PAGE_INFO,         // Controller info display
+    OLED_PAGE_JOY = 0,      // Joy animated controller character
+    OLED_PAGE_EYES,         // Two cartoon eyes (cylinder rotation)
+    OLED_PAGE_INFO,         // Controller info text display
     OLED_PAGE_COUNT
 } oled_page_t;
 
-static oled_page_t oled_current_page = OLED_PAGE_JOY;
+// Default page shown after boot. Module-level so a future flash-backed
+// config (web-config "Display" tab) can override before oled_init().
+// Temporarily defaulting to EYES to verify render — flip back to JOY
+// once verified.
+static oled_page_t oled_default_page = OLED_PAGE_EYES;
+static oled_page_t oled_current_page = OLED_PAGE_EYES;
 
 // Page navigation helpers
 static void oled_page_up(void) {
@@ -168,6 +176,7 @@ static void on_button_event(button_event_t event)
             usbd_set_mode(next);
 #if defined(OLED_I2C_INST) || defined(OLED_I2C_DISPLAY)
             joy_anim_event(JOY_EVENT_MODE_SWITCH);
+            eyes_anim_event(EYES_EVENT_RUMBLE);  // SURPRISED reaction works well for mode switch
 #endif
             break;
         }
@@ -256,6 +265,15 @@ static void oled_init(void) {
     };
     display_init_i2c(&cfg);
 
+    // I2C bus init (above) is unconditional; the OLED probe inside it
+    // decides whether to register the transport. If no display is present,
+    // skip every cycle the FeatherWing layer would burn each main loop.
+    if (!display_is_initialized()) {
+        printf("[app:usb2usb] OLED FeatherWing not detected at I2C 0x%02X — display features disabled\n",
+               OLED_I2C_ADDR);
+        return;
+    }
+
     // FeatherWing buttons: A (GPIO 9), B (GPIO 6), C (GPIO 5)
     // Button A conflicts with MAX3421E INT on USB host builds — only init if available
 #ifdef OLED_BUTTON_A_PIN
@@ -272,7 +290,10 @@ static void oled_init(void) {
     gpio_pull_up(OLED_BUTTON_C_PIN);
 
     joy_anim_init();
+    eyes_anim_init();
     joy_anim_event(JOY_EVENT_BOOT);
+    eyes_anim_event(EYES_EVENT_BOOT);
+    oled_current_page = oled_default_page;
 
     printf("[app:usb2usb] OLED FeatherWing initialized (I2C%d, buttons"
 #ifdef OLED_BUTTON_A_PIN
@@ -287,6 +308,9 @@ static void oled_init(void) {
 }
 
 static void oled_handle_buttons(void) {
+    // Skip when no display present — buttons live on the FeatherWing.
+    if (!display_is_initialized()) return;
+
     static bool last_a = true, last_b = true, last_c = true;  // Active-low (pull-up)
     static uint32_t debounce_a = 0, debounce_b = 0, debounce_c = 0;
     uint32_t now = platform_time_ms();
@@ -330,8 +354,15 @@ static void oled_init(void) {
         .addr     = 0x3C,
     };
     display_init_i2c(&cfg);  // SH1107 FeatherWing OLED
+    if (!display_is_initialized()) {
+        printf("[app:usb2usb] OLED display not detected — display features disabled\n");
+        return;
+    }
     joy_anim_init();
+    eyes_anim_init();
     joy_anim_event(JOY_EVENT_BOOT);
+    eyes_anim_event(EYES_EVENT_BOOT);
+    oled_current_page = oled_default_page;
     printf("[app:usb2usb] OLED display initialized (SH1107 I2C)\n");
 }
 #endif
@@ -343,6 +374,11 @@ static int oled_last_player_count = 0;
 static uint32_t oled_last_activity_ms = 0;
 
 static void oled_update_display(void) {
+    // No display detected → bail before any per-loop work. This is the
+    // single biggest hot path the OLED layer adds, so the early return
+    // here protects input→output latency on builds with no FeatherWing.
+    if (!display_is_initialized()) return;
+
     static uint32_t last_update = 0;
     static uint32_t last_buttons = 0;
     uint32_t now = platform_time_ms();
@@ -356,25 +392,74 @@ static void oled_update_display(void) {
         }
     }
 
-    // Detect connect/disconnect transitions for Joy
+    // Detect connect/disconnect transitions — fan out to both anims so
+    // page-switching at any time finds the destination already in the
+    // right state. Each event is a few struct writes; cost is negligible.
     if (playersCount > 0 && oled_last_player_count == 0) {
         joy_anim_event(JOY_EVENT_CONNECT);
+        eyes_anim_event(EYES_EVENT_CONNECT);
         oled_last_activity_ms = now;
     }
     if (playersCount == 0 && oled_last_player_count > 0) {
         joy_anim_event(JOY_EVENT_DISCONNECT);
+        eyes_anim_event(EYES_EVENT_DISCONNECT);
         oled_has_event = false;
     }
     oled_last_player_count = playersCount;
 
-    // Feed analog stick to Joy's look direction
+    // Feed analog stick to both characters' gaze — but only when the
+    // stick is meaningfully off-center. A tight deadzone (±10) keeps
+    // typical stick drift from constantly resetting the activity timer
+    // (so SLEEP can actually fire) and from drowning out the eyes'
+    // idle-wander behavior when the controller is sitting still. The
+    // same threshold drives oled_last_activity_ms, so wake-from-sleep
+    // and gaze-tracking share one source of truth.
     if (oled_has_event && playersCount > 0) {
-        float lx = (float)oled_cached_event.analog[ANALOG_LX] / 255.0f;
-        float ly = (float)oled_cached_event.analog[ANALOG_LY] / 255.0f;
-        joy_anim_set_look(lx, ly);
+        uint8_t lx_raw = oled_cached_event.analog[ANALOG_LX];
+        uint8_t ly_raw = oled_cached_event.analog[ANALOG_LY];
+        int16_t dx = (int16_t)lx_raw - 128;
+        int16_t dy = (int16_t)ly_raw - 128;
+        if (dx < -10 || dx > 10 || dy < -10 || dy > 10) {
+            float lx = (float)lx_raw / 255.0f;
+            float ly = (float)ly_raw / 255.0f;
+            joy_anim_set_look(lx, ly);
+            eyes_anim_set_look(lx, ly);
+            oled_last_activity_ms = now;
+        }
+
+        // L2/R2 triggers drive each eyelid (0=open, 255=fully closed).
+        // Always pushed (even at 0) so triggers releasing snap eyes
+        // back open. Counts as activity when held past a small threshold.
+        uint8_t l2 = oled_cached_event.analog[ANALOG_L2];
+        uint8_t r2 = oled_cached_event.analog[ANALOG_R2];
+        eyes_anim_set_eyelids((float)l2 / 255.0f, (float)r2 / 255.0f);
+        if (l2 > 16 || r2 > 16) {
+            oled_last_activity_ms = now;
+        }
     }
 
-    // Feed button presses to marquee and Joy (edge detection)
+    // Feed button presses to marquee and both anims (edge detection).
+    // Eyes use a per-button emotion mapping (below). Buttons not in the
+    // map fire no eye reaction — d-pad/triggers stay quiet so directional
+    // input doesn't constantly trigger reactions, and L2/R2 keep their
+    // eyelid mapping clean. Joy gets a generic HAPPY bounce on any button.
+    static const struct { uint32_t mask; eyes_state_t state; } eyes_button_map[] = {
+        { JP_BUTTON_B1, EYES_STATE_HAPPY      },  // A / Cross
+        { JP_BUTTON_B2, EYES_STATE_ANGRY      },  // B / Circle
+        { JP_BUTTON_B3, EYES_STATE_SUSPICIOUS },  // X / Square
+        { JP_BUTTON_B4, EYES_STATE_EXCITED    },  // Y / Triangle
+        { JP_BUTTON_L1, EYES_STATE_WINK_L     },
+        { JP_BUTTON_R1, EYES_STATE_WINK_R     },
+        { JP_BUTTON_S1, EYES_STATE_SAD        },  // Select / Back
+        { JP_BUTTON_S2, EYES_STATE_SURPRISED  },  // Start
+        { JP_BUTTON_A1, EYES_STATE_EXCITED    },  // Guide / Home / PS
+        { JP_BUTTON_A2, EYES_STATE_CONFUSED   },
+        { JP_BUTTON_L3, EYES_STATE_CONFUSED   },
+        { JP_BUTTON_R3, EYES_STATE_CONFUSED   },
+    };
+    static const size_t eyes_button_map_count =
+        sizeof(eyes_button_map) / sizeof(eyes_button_map[0]);
+
     uint32_t buttons = oled_has_event ? oled_cached_event.buttons : 0;
     uint32_t newly_pressed = ~last_buttons & buttons;
     last_buttons = buttons;
@@ -385,68 +470,102 @@ static void oled_update_display(void) {
             oled_last_activity_ms = now;
         }
     }
-
-    // Track activity for idle timeout
-    if (oled_has_event && playersCount > 0) {
-        uint8_t lx = oled_cached_event.analog[ANALOG_LX];
-        uint8_t ly = oled_cached_event.analog[ANALOG_LY];
-        // Analog stick moved away from center
-        if (lx < 108 || lx > 148 || ly < 108 || ly > 148) {
-            oled_last_activity_ms = now;
+    // Eye emotions: pick the highest-priority mapped button in this batch
+    // (table order = priority). One emotion per frame, so simultaneous
+    // chord presses don't fight for the state machine.
+    for (size_t i = 0; i < eyes_button_map_count; i++) {
+        if (newly_pressed & eyes_button_map[i].mask) {
+            eyes_anim_set_state(eyes_button_map[i].state);
+            break;
         }
     }
+    // Hold the emotion at its peak while ANY mapped button is still down.
+    // Release plays out automatically when none are held.
+    uint32_t held_emotion_mask = 0;
+    for (size_t i = 0; i < eyes_button_map_count; i++) {
+        held_emotion_mask |= eyes_button_map[i].mask;
+    }
+    eyes_anim_set_held((buttons & held_emotion_mask) != 0);
 
-    // Idle timeout → sleep
-    if (now - oled_last_activity_ms > 30000 &&
-        joy_anim_get_state() == JOY_STATE_IDLE) {
-        joy_anim_event(JOY_EVENT_IDLE_TIMEOUT);
+    // (Activity tracking is folded into the gaze-feed block above —
+    // both share the same ±10 deadzone so drift doesn't keep us awake.)
+
+    // Two-stage idle timeout, gated by anim state to avoid retriggering
+    // the same demotion every frame:
+    //   10s no activity → ACTIVE → IDLE  (resting blink, no gaze tracking)
+    //   70s no activity → IDLE   → SLEEP (half-lid breathing)
+    // Anim event handlers do single-step demotions; the state guards here
+    // pick which step fires when.
+    uint32_t idle_for = now - oled_last_activity_ms;
+    if (idle_for > 10000) {
+        if (joy_anim_get_state() == JOY_STATE_ACTIVE) {
+            joy_anim_event(JOY_EVENT_IDLE_TIMEOUT);
+        }
+        if (eyes_anim_get_state() == EYES_STATE_ACTIVE) {
+            eyes_anim_event(EYES_EVENT_IDLE_TIMEOUT);
+        }
+    }
+    if (idle_for > 70000) {
+        if (joy_anim_get_state() == JOY_STATE_IDLE) {
+            joy_anim_event(JOY_EVENT_IDLE_TIMEOUT);
+        }
+        if (eyes_anim_get_state() == EYES_STATE_IDLE) {
+            eyes_anim_event(EYES_EVENT_IDLE_TIMEOUT);
+        }
     }
 
     if (now - last_update < 50) return;  // 20fps max
     last_update = now;
 
-    display_clear();
+    // Only tick + render the visible page's animation. The other state
+    // machines stay frozen until their page is selected; events above
+    // still update them so the freeze is benign.
+    switch (oled_current_page) {
+        case OLED_PAGE_JOY:
+            joy_anim_tick(now);
+            joy_anim_render();
+            break;
 
-    if (oled_current_page == OLED_PAGE_JOY) {
-        // Joy character takes the full screen — no text overlays
-        joy_anim_tick(now);
-        joy_anim_render();
-    } else {
-        // Controller info display (existing layout)
-        usb_output_mode_t mode = usbd_get_mode();
-        display_text_large(0, 0, usbd_get_mode_name(mode));
+        case OLED_PAGE_EYES:
+            eyes_anim_tick(now);
+            eyes_anim_render();
+            break;
 
-        display_hline(0, 17, DISPLAY_WIDTH);
+        case OLED_PAGE_INFO:
+        default: {
+            display_clear();
+            usb_output_mode_t mode = usbd_get_mode();
+            display_text_large(0, 0, usbd_get_mode_name(mode));
 
-        if (playersCount > 0 && players[0].dev_addr >= 0) {
-            const char* name = get_player_name(0);
-            if (name) {
-                display_text(0, 20, name);
+            display_hline(0, 17, DISPLAY_WIDTH);
+
+            if (playersCount > 0 && players[0].dev_addr >= 0) {
+                const char* name = get_player_name(0);
+                if (name) {
+                    display_text(0, 20, name);
+                }
+
+                char info[22];
+                snprintf(info, sizeof(info), "%s dev:%d P%d/%d",
+                         transport_str(players[0].transport),
+                         players[0].dev_addr,
+                         players[0].player_number, playersCount);
+                display_text(0, 30, info);
+
+                if (oled_has_event) {
+                    char line[22];
+                    snprintf(line, sizeof(line), "L:%02X,%02X R:%02X,%02X T:%02X,%02X",
+                             oled_cached_event.analog[ANALOG_LX], oled_cached_event.analog[ANALOG_LY],
+                             oled_cached_event.analog[ANALOG_RX], oled_cached_event.analog[ANALOG_RY],
+                             oled_cached_event.analog[ANALOG_L2], oled_cached_event.analog[ANALOG_R2]);
+                    display_text(0, 40, line);
+                }
             }
 
-            char info[22];
-            snprintf(info, sizeof(info), "%s dev:%d P%d/%d",
-                     transport_str(players[0].transport),
-                     players[0].dev_addr,
-                     players[0].player_number, playersCount);
-            display_text(0, 30, info);
-
-            if (oled_has_event) {
-                char line[22];
-                snprintf(line, sizeof(line), "L:%02X,%02X R:%02X,%02X T:%02X,%02X",
-                         oled_cached_event.analog[ANALOG_LX], oled_cached_event.analog[ANALOG_LY],
-                         oled_cached_event.analog[ANALOG_RX], oled_cached_event.analog[ANALOG_RY],
-                         oled_cached_event.analog[ANALOG_L2], oled_cached_event.analog[ANALOG_R2]);
-                display_text(0, 40, line);
-            }
+            display_marquee_tick();
+            display_marquee_render(52);
+            break;
         }
-
-        // Button marquee at bottom
-        display_marquee_tick();
-        display_marquee_render(52);
-
-        // Tick Joy even when not displayed (keeps state machine running)
-        joy_anim_tick(now);
     }
 
     display_update();
@@ -509,8 +628,9 @@ void app_init(void)
     };
     players_init_with_config(&player_cfg);
 
-    // Set boot LED color (visible during potentially blocking USB host init)
-    leds_set_color(80, 80, 80);
+    // Set boot LED color (visible during potentially blocking USB host init).
+    // White stacks all 3 channels — keep low or it's blinding.
+    leds_set_color(10, 10, 10);
 
 #if defined(OLED_I2C_INST) || defined(OLED_I2C_DISPLAY)
     oled_init();

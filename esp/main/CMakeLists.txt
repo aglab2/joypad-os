@@ -58,6 +58,7 @@ if(CONFIG_APP STREQUAL "controller_btusb")
         "display_i2c_esp32.c"
         "${SHARED_SRC}/core/services/display/display.c"
         "${SHARED_SRC}/core/services/display/joy_anim.c"
+        "${SHARED_SRC}/core/services/display/eyes_anim.c"
         # Battery monitoring (I2C fuel gauge)
         "battery_esp32.c"
     )
@@ -79,6 +80,7 @@ elseif(CONFIG_APP STREQUAL "usb2usb")
         "display_i2c_esp32.c"
         "${SHARED_SRC}/core/services/display/display.c"
         "${SHARED_SRC}/core/services/display/joy_anim.c"
+        "${SHARED_SRC}/core/services/display/eyes_anim.c"
         "${SHARED_SRC}/platform/esp32/platform_i2c_esp32.c"
 
         # --- USB Host layer ---
@@ -147,6 +149,7 @@ elseif(CONFIG_APP STREQUAL "btusb2usb")
         "display_i2c_esp32.c"
         "${SHARED_SRC}/core/services/display/display.c"
         "${SHARED_SRC}/core/services/display/joy_anim.c"
+        "${SHARED_SRC}/core/services/display/eyes_anim.c"
         "${SHARED_SRC}/platform/esp32/platform_i2c_esp32.c"
 
         # --- USB Host layer ---

@@ -80,6 +80,11 @@ extern void le_device_db_remove(int index);
 #ifdef CONFIG_PAD_INPUT
 #include "pad/pad_config_flash.h"
 #endif
+#ifdef PAD_CONFIG_BOOT_WATCHDOG
+#include "hardware/watchdog.h"
+#include "hardware/regs/addressmap.h"
+#include "hardware/structs/watchdog.h"
+#endif
 #ifdef SENSOR_PAD
 #include "pad/pad_input.h"
 #ifdef PAD_CONFIG_ABB
@@ -96,10 +101,10 @@ extern void le_device_db_remove(int index);
 #endif
 #endif
 
-// OLED display + Joy animation (conditional)
+// OLED display + eyes animation (conditional)
 #if defined(OLED_I2C_INST) || defined(OLED_I2C_DISPLAY)
 #include "core/services/display/display.h"
-#include "core/services/display/joy_anim.h"
+#include "core/services/display/eyes_anim.h"
 #endif
 
 // ============================================================================
@@ -281,6 +286,27 @@ void app_init(void)
     // Initialize pad config storage (needed for CDC commands on all platforms)
 #ifdef CONFIG_PAD_INPUT
     pad_config_flash_init();
+#ifdef PAD_CONFIG_BOOT_WATCHDOG
+    // Boot-attempts counter lives in watchdog scratch (preserved across
+    // soft / watchdog reboots). If the prior boot crashed, the HW
+    // watchdog (enabled below) reboots the chip without resetting the
+    // counter, so we accumulate failures here. After 3 in a row, wipe
+    // the saved pad config so we can recover; reset to 0 once the main
+    // loop has been running long enough to call init "succeeded".
+    {
+        uint32_t attempts = watchdog_hw->scratch[0];
+        if (attempts >= 3) {
+            pad_config_reset();
+            printf("[app:controller_btusb] Boot watchdog: %u failed boots — wiped pad config\n",
+                   (unsigned)attempts);
+            attempts = 0;
+        }
+        watchdog_hw->scratch[0] = attempts + 1;
+    }
+    // Enable HW watchdog (8s) — if init hangs (e.g. seesaw I2C never
+    // ACKs), the chip reboots and the counter above accumulates.
+    watchdog_enable(8000, true);
+#endif
     {
         // Apply LED config and settings from pad config
         const pad_device_config_t* led_cfg = pad_config_load_runtime();
@@ -476,9 +502,13 @@ void app_init(void)
         };
         display_init_i2c(&oled_cfg);
     }
-    joy_anim_init();
-    joy_anim_event(JOY_EVENT_BOOT);
-    printf("[app:controller_btusb] OLED + Joy animation initialized\n");
+    if (display_is_initialized()) {
+        eyes_anim_init();
+        eyes_anim_event(EYES_EVENT_BOOT);
+        printf("[app:controller_btusb] OLED + eyes animation initialized\n");
+    } else {
+        printf("[app:controller_btusb] No OLED detected — display features disabled\n");
+    }
 #elif defined(OLED_I2C_DISPLAY)
     // Initialize OLED display (nRF — I2C configured via devicetree)
     {
@@ -490,9 +520,13 @@ void app_init(void)
         };
         display_init_i2c(&oled_cfg);
     }
-    joy_anim_init();
-    joy_anim_event(JOY_EVENT_BOOT);
-    printf("[app:controller_btusb] OLED + Joy animation initialized (I2C)\n");
+    if (display_is_initialized()) {
+        eyes_anim_init();
+        eyes_anim_event(EYES_EVENT_BOOT);
+        printf("[app:controller_btusb] OLED + eyes animation initialized (I2C)\n");
+    } else {
+        printf("[app:controller_btusb] No OLED detected — display features disabled\n");
+    }
 #endif
 
     // Initialize profile system (no built-in profiles, custom only)
@@ -514,6 +548,19 @@ void app_init(void)
 
 void app_task(void)
 {
+#ifdef PAD_CONFIG_BOOT_WATCHDOG
+    // Feed the boot-attempt watchdog every iteration. After 5s of
+    // running normally, mark this boot as "succeeded" by zeroing the
+    // attempts counter so the next boot starts fresh.
+    watchdog_update();
+    static bool boot_marked_ok = false;
+    if (!boot_marked_ok && platform_time_ms() > 5000) {
+        watchdog_hw->scratch[0] = 0;
+        boot_marked_ok = true;
+        printf("[app:controller_btusb] Boot watchdog: marked successful\n");
+    }
+#endif
+
     // Process button input
     button_task();
 
@@ -613,56 +660,104 @@ void app_task(void)
 #endif
 
 #if defined(OLED_I2C_INST) || defined(OLED_I2C_DISPLAY)
-    // Joy animation: feed input events from JoyWing → Joy
-    {
+    // Eyes animation: feed input events from the connected pad → eyes.
+    // Same per-button emotion mapping + L2/R2 eyelids + staged idle as
+    // the usb2usb app, but driven by the local pad through the router.
+    if (display_is_initialized()) {
         static uint32_t last_buttons = 0;
         static bool last_connected = false;
+        static bool ever_connected = false;
         static uint32_t last_activity_ms = 0;
+        static uint32_t last_render_ms = 0;
+
+        // Per-button emotion table (same as usb2usb).
+        static const struct { uint32_t mask; eyes_state_t state; } eyes_button_map[] = {
+            { JP_BUTTON_B1, EYES_STATE_HAPPY      },
+            { JP_BUTTON_B2, EYES_STATE_ANGRY      },
+            { JP_BUTTON_B3, EYES_STATE_SUSPICIOUS },
+            { JP_BUTTON_B4, EYES_STATE_EXCITED    },
+            { JP_BUTTON_L1, EYES_STATE_WINK_L     },
+            { JP_BUTTON_R1, EYES_STATE_WINK_R     },
+            { JP_BUTTON_S1, EYES_STATE_SAD        },
+            { JP_BUTTON_S2, EYES_STATE_SURPRISED  },
+            { JP_BUTTON_A1, EYES_STATE_EXCITED    },
+            { JP_BUTTON_A2, EYES_STATE_CONFUSED   },
+            { JP_BUTTON_L3, EYES_STATE_CONFUSED   },
+            { JP_BUTTON_R3, EYES_STATE_CONFUSED   },
+        };
+        static const size_t eyes_button_map_count =
+            sizeof(eyes_button_map) / sizeof(eyes_button_map[0]);
+        static uint32_t held_emotion_mask = 0;
+        if (held_emotion_mask == 0) {
+            for (size_t i = 0; i < eyes_button_map_count; i++) {
+                held_emotion_mask |= eyes_button_map[i].mask;
+            }
+        }
 
         uint32_t now = platform_time_ms();
         const input_event_t* ev = router_get_output(OUTPUT_TARGET_USB_DEVICE, 0);
 
-        // Detect JoyWing connect/disconnect
-        bool connected = (ev && ev->buttons != 0) ||
-                         (ev && (ev->analog[ANALOG_LX] < 100 || ev->analog[ANALOG_LX] > 156 ||
-                                 ev->analog[ANALOG_LY] < 100 || ev->analog[ANALOG_LY] > 156));
-        // Latch connected once any input arrives
-        static bool ever_connected = false;
+        bool connected = ev && (ev->buttons != 0
+                                || ev->analog[ANALOG_LX] < 100 || ev->analog[ANALOG_LX] > 156
+                                || ev->analog[ANALOG_LY] < 100 || ev->analog[ANALOG_LY] > 156);
         if (connected) ever_connected = true;
 
         if (ever_connected && !last_connected) {
-            joy_anim_event(JOY_EVENT_CONNECT);
+            eyes_anim_event(EYES_EVENT_CONNECT);
             last_connected = true;
+            last_activity_ms = now;
         }
 
         if (ev && ever_connected) {
-            // Analog stick → look direction (0-255 → 0.0-1.0)
-            float lx = ev->analog[ANALOG_LX] / 255.0f;
-            float ly = ev->analog[ANALOG_LY] / 255.0f;
-            if (lx < 0.45f || lx > 0.55f || ly < 0.45f || ly > 0.55f) {
-                joy_anim_set_look(lx, ly);
+            // Stick gaze + activity (±10 deadzone keeps drift quiet).
+            uint8_t lx_raw = ev->analog[ANALOG_LX];
+            uint8_t ly_raw = ev->analog[ANALOG_LY];
+            int16_t dx = (int16_t)lx_raw - 128;
+            int16_t dy = (int16_t)ly_raw - 128;
+            if (dx < -10 || dx > 10 || dy < -10 || dy > 10) {
+                eyes_anim_set_look((float)lx_raw / 255.0f, (float)ly_raw / 255.0f);
                 last_activity_ms = now;
             }
 
-            // Button press edge detection
-            if (ev->buttons && ev->buttons != last_buttons) {
-                joy_anim_event(JOY_EVENT_BUTTON_PRESS);
+            // L2/R2 → per-eye eyelids.
+            uint8_t l2 = ev->analog[ANALOG_L2];
+            uint8_t r2 = ev->analog[ANALOG_R2];
+            eyes_anim_set_eyelids((float)l2 / 255.0f, (float)r2 / 255.0f);
+            if (l2 > 16 || r2 > 16) last_activity_ms = now;
+
+            // Button press emotion (rising edge), gated by table.
+            uint32_t newly_pressed = ~last_buttons & ev->buttons;
+            if (newly_pressed) {
                 last_activity_ms = now;
+                for (size_t i = 0; i < eyes_button_map_count; i++) {
+                    if (newly_pressed & eyes_button_map[i].mask) {
+                        eyes_anim_set_state(eyes_button_map[i].state);
+                        break;
+                    }
+                }
             }
             last_buttons = ev->buttons;
-
-            // Idle timeout → sleep after 30s
-            if (now - last_activity_ms > 30000 &&
-                joy_anim_get_state() == JOY_STATE_IDLE) {
-                joy_anim_event(JOY_EVENT_IDLE_TIMEOUT);
-            }
+            // Hold while any mapped button is still down.
+            eyes_anim_set_held((ev->buttons & held_emotion_mask) != 0);
         }
 
-        // Tick + render
-        if (joy_anim_tick(now)) {
-            display_clear();
-            joy_anim_render();
+        // Two-stage idle: ACTIVE → IDLE @10s, IDLE → SLEEP @70s.
+        uint32_t idle_for = now - last_activity_ms;
+        if (idle_for > 10000 && eyes_anim_get_state() == EYES_STATE_ACTIVE) {
+            eyes_anim_event(EYES_EVENT_IDLE_TIMEOUT);
+        }
+        if (idle_for > 70000 && eyes_anim_get_state() == EYES_STATE_IDLE) {
+            eyes_anim_event(EYES_EVENT_IDLE_TIMEOUT);
+        }
+
+        // Tick + render at ~20fps cap (same as usb2usb).
+        if (now - last_render_ms >= 50) {
+            last_render_ms = now;
+            eyes_anim_tick(now);
+            eyes_anim_render();
             display_update();
+        } else {
+            eyes_anim_tick(now);
         }
     }
 #endif
