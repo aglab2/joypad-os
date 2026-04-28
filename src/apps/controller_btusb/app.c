@@ -106,10 +106,70 @@ extern void le_device_db_remove(int index);
 #include "core/services/display/display.h"
 #include "core/services/display/eyes_anim.h"
 #include "core/services/display/joy_anim.h"
+#include "core/services/display/menu.h"
+#include "platform/platform.h"
 #include "usb/usbd/cdc/cdc_commands.h"
 #ifdef OLED_BUTTON_B_PIN
 #include "hardware/gpio.h"
 #endif
+
+// ============================================================================
+// MENU — built up from a few const tables. Activated when the user holds
+// B (long-press); A/C scroll, B selects, long-press B = back / exit.
+// ============================================================================
+
+static void menu_action_reboot(void) {
+    platform_reboot();
+}
+
+static void menu_action_bootsel(void) {
+    platform_reboot_bootloader();
+}
+
+static void menu_set_usb_sinput(void)     { usbd_set_mode(USB_OUTPUT_MODE_SINPUT); }
+static void menu_set_usb_xinput(void)     { usbd_set_mode(USB_OUTPUT_MODE_XINPUT); }
+static void menu_set_usb_ps3(void)        { usbd_set_mode(USB_OUTPUT_MODE_PS3); }
+static void menu_set_usb_ps4(void)        { usbd_set_mode(USB_OUTPUT_MODE_PS4); }
+static void menu_set_usb_switch(void)     { usbd_set_mode(USB_OUTPUT_MODE_SWITCH); }
+static void menu_set_usb_kb_mouse(void)   { usbd_set_mode(USB_OUTPUT_MODE_KEYBOARD_MOUSE); }
+
+// Right-aligned indicator showing the current USB mode against each item.
+static const char* mark_if_current(usb_output_mode_t target) {
+    return (usbd_get_mode() == target) ? "*" : "";
+}
+static const char* mark_sinput(void)    { return mark_if_current(USB_OUTPUT_MODE_SINPUT); }
+static const char* mark_xinput(void)    { return mark_if_current(USB_OUTPUT_MODE_XINPUT); }
+static const char* mark_ps3(void)       { return mark_if_current(USB_OUTPUT_MODE_PS3); }
+static const char* mark_ps4(void)       { return mark_if_current(USB_OUTPUT_MODE_PS4); }
+static const char* mark_switch(void)    { return mark_if_current(USB_OUTPUT_MODE_SWITCH); }
+static const char* mark_kbmouse(void)   { return mark_if_current(USB_OUTPUT_MODE_KEYBOARD_MOUSE); }
+
+// DInput (USB_OUTPUT_MODE_HID) intentionally omitted — replaced by SInput
+// and hidden in the web config too (cmd_mode_list skips it).
+static const menu_item_t usb_mode_items[] = {
+    { "SInput",     menu_set_usb_sinput,   NULL, mark_sinput  },
+    { "XInput",     menu_set_usb_xinput,   NULL, mark_xinput  },
+    { "PS3",        menu_set_usb_ps3,      NULL, mark_ps3     },
+    { "PS4",        menu_set_usb_ps4,      NULL, mark_ps4     },
+    { "Switch",     menu_set_usb_switch,   NULL, mark_switch  },
+    { "KB+Mouse",   menu_set_usb_kb_mouse, NULL, mark_kbmouse },
+};
+static const menu_t usb_mode_menu = {
+    .title = "USB Mode",
+    .items = usb_mode_items,
+    .count = sizeof(usb_mode_items) / sizeof(usb_mode_items[0]),
+};
+
+static const menu_item_t main_items[] = {
+    { "USB Mode",   NULL,                  &usb_mode_menu, NULL },
+    { "Reboot",     menu_action_reboot,    NULL,           NULL },
+    { "Bootloader", menu_action_bootsel,   NULL,           NULL },
+};
+static const menu_t main_menu = {
+    .title = "Menu",
+    .items = main_items,
+    .count = sizeof(main_items) / sizeof(main_items[0]),
+};
 
 // FeatherWing display modes — paged with the OLED's B (center) button.
 // Future plan: A=up, B=confirm, C=down for menu navigation. For now B
@@ -824,22 +884,73 @@ void app_task(void)
         }
 
 #ifdef OLED_BUTTON_B_PIN
-        // B-button edge detection (active-low with pull-up). Cycle the
-        // display mode on press.
+        // FeatherWing buttons: A=up, B=select (short) / back+exit (long),
+        // C=down. While menu is open, all three drive menu navigation.
+        // While closed, B short-press cycles display modes; B long-press
+        // (>500ms hold) opens the menu.
         {
-            static bool last_b = true;
-            static uint32_t debounce_b = 0;
+            static bool last_a = true, last_b = true, last_c = true;
+            static uint32_t debounce_a = 0, debounce_b_press = 0, debounce_c = 0;
+            static uint32_t b_press_start = 0;
+            static bool b_long_fired = false;
+
+#ifdef OLED_BUTTON_A_PIN
+            bool a = gpio_get(OLED_BUTTON_A_PIN);
+            if (!a && last_a && (now - debounce_a > 150)) {
+                debounce_a = now;
+                if (menu_is_open()) menu_input(MENU_BTN_UP);
+            }
+            last_a = a;
+#endif
+#ifdef OLED_BUTTON_C_PIN
+            bool c = gpio_get(OLED_BUTTON_C_PIN);
+            if (!c && last_c && (now - debounce_c > 150)) {
+                debounce_c = now;
+                if (menu_is_open()) menu_input(MENU_BTN_DOWN);
+            }
+            last_c = c;
+#endif
             bool b = gpio_get(OLED_BUTTON_B_PIN);
-            if (!b && last_b && (now - debounce_b > 200)) {
-                debounce_b = now;
-                oled_current_mode = (oled_mode_t)((oled_current_mode + 1) % OLED_MODE_COUNT);
-                printf("[app:controller_btusb] OLED mode → %d\n", oled_current_mode);
+            // Falling edge — start tracking hold time.
+            if (!b && last_b && (now - debounce_b_press > 200)) {
+                debounce_b_press = now;
+                b_press_start = now;
+                b_long_fired = false;
+            }
+            // Detect long-press while held.
+            if (!b && !b_long_fired && (now - b_press_start) > 500) {
+                b_long_fired = true;
+                if (menu_is_open()) {
+                    menu_input(MENU_BTN_BACK);
+                } else {
+                    menu_open(&main_menu);
+                }
+            }
+            // Rising edge — short press if not already a long press.
+            if (b && !last_b) {
+                if (!b_long_fired && b_press_start != 0) {
+                    if (menu_is_open()) {
+                        menu_input(MENU_BTN_SELECT);
+                    } else {
+                        oled_current_mode = (oled_mode_t)((oled_current_mode + 1) % OLED_MODE_COUNT);
+                        printf("[app:controller_btusb] OLED mode → %d\n", oled_current_mode);
+                    }
+                }
+                b_press_start = 0;
             }
             last_b = b;
         }
 #endif
 
-        if (now - last_render_ms >= 100) {
+        if (menu_is_open()) {
+            // Menu always renders at full rate so navigation feels snappy.
+            // Skips the per-mode tick block entirely.
+            if (now - last_render_ms >= 50) {
+                last_render_ms = now;
+                menu_render();
+                display_update();
+            }
+        } else if (now - last_render_ms >= 100) {
             last_render_ms = now;
             switch (oled_current_mode) {
                 case OLED_MODE_JOY:
