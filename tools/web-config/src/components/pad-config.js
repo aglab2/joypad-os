@@ -131,9 +131,9 @@ export class PadConfigCard {
                         <div id="padJoywing${i}Pins" style="display:none;">
                             <div class="pad-form-row">
                                 <span class="label">I2C Bus</span>
-                                <select id="padJoywing${i}Bus">
+                                <select id="padJoywing${i}Bus" title="RP2040: bus 1 for GPIO 2/3, 6/7, 10/11, 14/15, 18/19, 22/23, 26/27. ESP32: any bus.">
                                     <option value="0">I2C0</option>
-                                    <option value="1">I2C1</option>
+                                    <option value="1" selected>I2C1</option>
                                 </select>
                             </div>
                             <div class="pad-form-row">

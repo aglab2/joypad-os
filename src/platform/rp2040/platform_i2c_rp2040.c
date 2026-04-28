@@ -38,18 +38,26 @@ platform_i2c_t platform_i2c_init(const platform_i2c_config_t* config)
     return bus;
 }
 
+// 10ms per I2C op — generous for normal slaves at 400kHz but bounded so
+// a misconfigured pin assignment / missing device / stuck bus can't
+// hang init forever. The plain *_blocking variants will spin forever
+// if the slave clock-stretches indefinitely.
+#define PLATFORM_I2C_TIMEOUT_US 10000
+
 int platform_i2c_write(platform_i2c_t bus, uint8_t addr, const uint8_t* data, size_t len)
 {
     if (!bus || !bus->initialized) return -1;
-    int ret = i2c_write_blocking(bus->inst, addr, data, len, false);
-    return (ret == PICO_ERROR_GENERIC) ? -1 : 0;
+    int ret = i2c_write_timeout_us(bus->inst, addr, data, len, false,
+                                   PLATFORM_I2C_TIMEOUT_US);
+    return (ret < 0) ? -1 : 0;
 }
 
 int platform_i2c_read(platform_i2c_t bus, uint8_t addr, uint8_t* data, size_t len)
 {
     if (!bus || !bus->initialized) return -1;
-    int ret = i2c_read_blocking(bus->inst, addr, data, len, false);
-    return (ret == PICO_ERROR_GENERIC) ? -1 : 0;
+    int ret = i2c_read_timeout_us(bus->inst, addr, data, len, false,
+                                  PLATFORM_I2C_TIMEOUT_US);
+    return (ret < 0) ? -1 : 0;
 }
 
 int platform_i2c_write_read(platform_i2c_t bus, uint8_t addr,
@@ -58,10 +66,11 @@ int platform_i2c_write_read(platform_i2c_t bus, uint8_t addr,
 {
     if (!bus || !bus->initialized) return -1;
 
-    // Write with nostop=true for repeated start
-    int ret = i2c_write_blocking(bus->inst, addr, wr, wr_len, true);
-    if (ret == PICO_ERROR_GENERIC) return -1;
+    int ret = i2c_write_timeout_us(bus->inst, addr, wr, wr_len, true,
+                                   PLATFORM_I2C_TIMEOUT_US);
+    if (ret < 0) return -1;
 
-    ret = i2c_read_blocking(bus->inst, addr, rd, rd_len, false);
-    return (ret == PICO_ERROR_GENERIC) ? -1 : 0;
+    ret = i2c_read_timeout_us(bus->inst, addr, rd, rd_len, false,
+                              PLATFORM_I2C_TIMEOUT_US);
+    return (ret < 0) ? -1 : 0;
 }

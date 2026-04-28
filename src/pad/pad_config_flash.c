@@ -223,9 +223,43 @@ void pad_config_flash_init(void) {
     pad_config_storage_init();
 }
 
+// Range-check a pin field. Valid: -1 (disabled) or 0..29 (RP2040 GPIO).
+// Anything else means the saved config is corrupt or written by a build
+// for a different platform — reject it instead of letting it crash boot.
+static bool pin_ok(int16_t pin) {
+    return pin == -1 || (pin >= 0 && pin <= 29);
+}
+
+static bool pad_config_flash_valid(const pad_config_flash_t* f) {
+    if (f->magic != PAD_CONFIG_MAGIC) return false;
+    if (!pin_ok(f->i2c_sda) || !pin_ok(f->i2c_scl)) return false;
+    for (int i = 0; i < 22; i++) {
+        if (!pin_ok(f->buttons[i])) return false;
+    }
+    if (!pin_ok(f->led_pin)) return false;
+    if (!pin_ok(f->speaker_pin) || !pin_ok(f->speaker_enable_pin)) return false;
+    if (!pin_ok(f->display_spi) || !pin_ok(f->display_sck) || !pin_ok(f->display_mosi)
+        || !pin_ok(f->display_cs) || !pin_ok(f->display_dc) || !pin_ok(f->display_rst)) return false;
+    if (!pin_ok(f->qwiic_tx) || !pin_ok(f->qwiic_rx)) return false;
+    if (!pin_ok(f->usb_host_dp)) return false;
+    if (!pin_ok(f->f1_pin) || !pin_ok(f->f2_pin)) return false;
+    if (!pin_ok(f->rhat_up) || !pin_ok(f->rhat_down)
+        || !pin_ok(f->rhat_left) || !pin_ok(f->rhat_right)) return false;
+    for (int i = 0; i < 2; i++) {
+        if (!pin_ok(f->toggle[i].pin)) return false;
+        if (!pin_ok(f->joywing[i].sda) || !pin_ok(f->joywing[i].scl)) return false;
+        if (f->joywing[i].i2c_bus < -1 || f->joywing[i].i2c_bus > 1) return false;
+    }
+    return true;
+}
+
 const pad_device_config_t* pad_config_load_runtime(void) {
     pad_config_flash_t flash_data;
     if (!pad_config_storage_load(&flash_data)) {
+        return NULL;
+    }
+    if (!pad_config_flash_valid(&flash_data)) {
+        printf("[pad_config] Saved config failed validation — ignoring\n");
         return NULL;
     }
     const pad_device_config_t* config = pad_config_from_flash(&flash_data);
