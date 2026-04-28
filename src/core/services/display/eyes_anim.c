@@ -523,12 +523,13 @@ static void render_eye(int x_left, int y_top, int w, int h,
         if (base_r < 2) base_r = 2;
         if (base_r > 10) base_r = 10;   // slightly smaller "boba"
 
-        // Curve fade: as the smile-arc cut grows past ~half the eye, the
-        // pupil disappears. Without this we'd get a stranded half-moon
-        // pupil hovering inside the closed-curve shape during a blink.
+        // Curve fade: pupil shrinks as the smile-arc cut grows so it
+        // doesn't get clipped into a half-moon at the cut boundary.
+        // Fully hidden by curve >= 50 (HAPPY peak / blink / wink), full
+        // size below curve 20 (resting / mild smile).
         float curve_fade = 1.0f;
-        if (curve > 50) {
-            curve_fade = (100.0f - (float)curve) / 50.0f;
+        if (curve > 20) {
+            curve_fade = (50.0f - (float)curve) / 30.0f;
             if (curve_fade < 0.0f) curve_fade = 0.0f;
         }
 

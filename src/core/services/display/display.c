@@ -334,6 +334,63 @@ void display_clear(void) {
     memset(framebuffer, 0, sizeof(framebuffer));
 }
 
+// Incremental flush state — page index of the next page to send.
+// 0xFF = no flush in progress.
+static uint8_t flush_page_idx = 0xFF;
+
+bool display_flush_step(void) {
+    if (!initialized) return false;
+    // Start a new flush if dirty and not already mid-flush.
+    if (flush_page_idx == 0xFF) {
+        if (!dirty) return false;
+        dirty = false;
+        flush_page_idx = 0;
+    }
+
+    if (rotated_panel) {
+        uint8_t page = flush_page_idx;
+        write_cmd(SH110X_SET_PAGE_ADDR | page);
+        write_cmd(SH110X_SET_LOW_COLUMN | (col_offset & 0x0F));
+        write_cmd(SH110X_SET_HIGH_COLUMN | (col_offset >> 4));
+
+        uint8_t page_data[64];
+        for (uint8_t col = 0; col < 64; col++) {
+            uint8_t byte = 0;
+            uint8_t y = 63 - col;
+            uint8_t fb_page = y / 8;
+            uint8_t fb_bit = y % 8;
+            for (uint8_t bit = 0; bit < 8; bit++) {
+                uint8_t x = page * 8 + bit;
+                if (x < DISPLAY_WIDTH && (framebuffer[fb_page][x] & (1 << fb_bit))) {
+                    byte |= (1 << bit);
+                }
+            }
+            page_data[col] = byte;
+        }
+        write_data(page_data, 64);
+
+        flush_page_idx++;
+        if (flush_page_idx >= 16) {
+            flush_page_idx = 0xFF;
+            return false;
+        }
+        return true;
+    } else {
+        uint8_t page = flush_page_idx;
+        write_cmd(SH110X_SET_PAGE_ADDR | page);
+        write_cmd(SH110X_SET_LOW_COLUMN | (col_offset & 0x0F));
+        write_cmd(SH110X_SET_HIGH_COLUMN | (col_offset >> 4));
+        write_data(framebuffer[page], DISPLAY_WIDTH);
+
+        flush_page_idx++;
+        if (flush_page_idx >= 8) {
+            flush_page_idx = 0xFF;
+            return false;
+        }
+        return true;
+    }
+}
+
 void display_flush(void) {
     if (!initialized) return;
     dirty = false;

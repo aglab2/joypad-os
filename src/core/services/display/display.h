@@ -90,6 +90,13 @@ void display_set_async(bool async);
 void display_flush(void);
 bool display_is_dirty(void);
 
+// Incremental flush: send ONE page per call instead of the whole frame.
+// Returns true while a flush is in progress (more pages remain), false
+// when nothing to send. Lets a single-core app spread the flush work
+// across many main-loop iterations so no single iteration blocks for
+// the full ~57ms it takes to push 1KB over 400kHz I2C.
+bool display_flush_step(void);
+
 // Invert display colors
 void display_invert(bool invert);
 
