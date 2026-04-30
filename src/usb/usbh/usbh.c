@@ -222,11 +222,13 @@ void tuh_umount_cb(uint8_t dev_addr)
 // Input Interface
 //--------------------------------------------------------------------+
 
+static bool usbh_is_connected(void) { return usb_host_device_count > 0; }
+
 const InputInterface usbh_input_interface = {
     .name = "USB Host",
     .source = INPUT_SOURCE_USB_HOST,
     .init = usbh_init,
     .task = usbh_task,
-    .is_connected = NULL,       // TODO: Track connected device count
-    .get_device_count = NULL,   // TODO: Return connected device count
+    .is_connected = usbh_is_connected,
+    .get_device_count = usbh_get_device_count,
 };

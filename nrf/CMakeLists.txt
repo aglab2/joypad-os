@@ -50,6 +50,7 @@ set(SRCS
     "${SHARED_SRC}/core/services/display/joy_anim.c"
 
     # --- Core services ---
+    "${SHARED_SRC}/core/app_registry.c"
     "${SHARED_SRC}/core/router/router.c"
     "${SHARED_SRC}/core/services/leds/leds.c"
     "${SHARED_SRC}/core/services/storage/storage.c"

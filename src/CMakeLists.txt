@@ -82,6 +82,7 @@ target_compile_definitions(tinyusb_max3421 INTERFACE CONFIG_MAX3421=1)
 # Core sources (no USB host - used by native-input apps)
 set(CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/app_registry.c
     ${CMAKE_CURRENT_SOURCE_DIR}/core/router/router.c
     ${CMAKE_CURRENT_SOURCE_DIR}/core/services/leds/leds.c
     ${CMAKE_CURRENT_SOURCE_DIR}/core/services/leds/neopixel/ws2812.c

@@ -1138,6 +1138,11 @@ uint8_t router_get_player_count(output_target_t output) {
     return (uint8_t)playersCount;
 }
 
+uint8_t router_get_max_players(output_target_t output) {
+    if (output < 0 || output >= MAX_OUTPUTS) return 0;
+    return router_config.max_players_per_output[output];
+}
+
 // ============================================================================
 // ROUTING CONFIGURATION
 // ============================================================================

@@ -23,6 +23,7 @@
 #include "pico/multicore.h"
 #include "pico/flash.h"
 
+#include "core/app_registry.h"
 #include "core/input_interface.h"
 #include "core/output_interface.h"
 #include "core/services/players/manager.h"
@@ -190,6 +191,9 @@ int main(void)
       inputs[i]->init();
     }
   }
+
+  // Publish active interfaces so shared code (CDC, router) can introspect.
+  app_registry_set(inputs, input_count, outputs, output_count);
 
   core0_main();
 
