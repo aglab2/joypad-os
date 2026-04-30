@@ -1949,9 +1949,15 @@ joypad_target_common(joypad_gc2usb)
 pico_generate_pio_header(joypad_gc2usb ${CMAKE_CURRENT_LIST_DIR}/lib/joybus-pio/src/joybus.pio)
 
 # --- GC2USB (GameCube -> USB HID, RP2040-Zero) ---
+# Note: this target is currently NOT what `make gc2usb_rp2040zero` actually
+# builds — that uses joypad_gc2usb (GP29) with the rp2040zero board script.
+# Keeping GC_PIN_DATA=29 here so that any future Makefile rewire (or anyone
+# building this target directly) matches the wiring shipped to existing
+# customers since v2.0.0.
 add_executable(joypad_gc2usb_rp2040zero)
 target_compile_definitions(joypad_gc2usb_rp2040zero PRIVATE
     CONFIG_GC2USB=1 CONFIG_USB=1 DISABLE_USB_HOST=1
+    GC_PIN_DATA=29
     WS2812_PIN=16
     USE_BOOTSEL_BUTTON=1
 )
