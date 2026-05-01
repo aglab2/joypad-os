@@ -24,18 +24,11 @@ Cable wire colors vary by manufacturer — verify with a multimeter against the 
 
 The console provides the joybus pull-up internally, so KB2040's 3V3 rail does not need to be wired to the cable. Play/config mode is detected by reading the data line on boot — if it idles HIGH, the console is connected and play mode runs; if LOW, the adapter falls back to USB device + CDC config mode.
 
-### USB Host Port
+### Controller Input
 
-Wire a USB-A female connector for controller input. See [Wiring Guide](../wiring.md) for details.
+The KB2040's native USB-C port is the host. Plug your USB controller into it through a USB-C-to-USB-A adapter (USB OTG) — no GPIO wiring is needed for the host side. The joybus PIO program would clash with PIO-USB on RP2040, so this build deliberately uses the native USB controller for input and reserves PIO entirely for the GameCube data line.
 
-KB2040 uses the same pins as Pico for PIO-USB:
-
-| KB2040 Pin | USB-A Pin | Signal |
-|------------|-----------|--------|
-| GPIO 16 | 3 | D+ (green) |
-| GPIO 17 | 2 | D- (white) |
-| 5V | 1 | VBUS (red) |
-| GND | 4 | GND (black) |
+For Bluetooth controllers, the KB2040 has no onboard radio — plug a CSR8510-class USB BT dongle into the USB-C port (use a USB hub if you also need a wired controller alongside).
 
 ## Wiring Diagram
 
