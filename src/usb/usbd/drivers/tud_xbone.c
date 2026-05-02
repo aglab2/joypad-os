@@ -378,6 +378,40 @@ bool tud_xbone_send_report(gip_input_report_t* report)
     return false;
 }
 
+bool tud_xbone_send_virtual_keycode(uint8_t keycode, bool pressed)
+{
+    // GIP virtual keycode packet: header(4) + payload(2)
+    //   payload[0] = pressed flag (0x01 = down, 0x00 = up)
+    //   payload[1] = keycode (Guide = 0x5B)
+    // needs_ack=1 + internal=1 matches the form real controllers send. The
+    // bit in the standard input report is informational; consoles only open
+    // the Guide overlay on receipt of this packet pair.
+    uint8_t pkt[sizeof(gip_header_t) + 2] = { 0 };
+    gip_header_t* hdr = (gip_header_t*)pkt;
+    hdr->command = GIP_VIRTUAL_KEYCODE;
+    hdr->client = 0;
+    hdr->needs_ack = 1;
+    hdr->internal = 1;
+    hdr->chunk_start = 0;
+    hdr->chunked = 0;
+    hdr->sequence = input_report_sequence;
+    hdr->length = 2;
+    pkt[sizeof(gip_header_t) + 0] = pressed ? 0x01 : 0x00;
+    pkt[sizeof(gip_header_t) + 1] = keycode;
+
+    if (send_report_internal(pkt, sizeof(pkt))) {
+        input_report_sequence++;
+        if (input_report_sequence == 0) input_report_sequence = 1;
+        return true;
+    }
+    return false;
+}
+
+bool tud_xbone_send_guide(bool pressed)
+{
+    return tud_xbone_send_virtual_keycode(0x5B, pressed);
+}
+
 void tud_xbone_update(void)
 {
     uint32_t now = platform_time_ms();
