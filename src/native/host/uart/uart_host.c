@@ -1,8 +1,8 @@
 // uart_host.c - UART Host Implementation
 //
 // Receives controller inputs from a remote device over UART and submits
-// them to the router. Supports both normal mode (inputs go to router)
-// and AI blend mode (inputs can blend with existing player inputs).
+// them to the router. The remote treats this UART link as a synthetic
+// controller bus (joypad-mcp, sibling boards, etc.).
 
 #include "uart_host.h"
 #include "core/uart/uart_protocol.h"
@@ -37,16 +37,6 @@ static uint8_t rx_index = 0;
 static uint8_t rx_length = 0;
 static uint8_t rx_type = 0;
 
-// AI injection state per player
-typedef struct {
-    uart_blend_mode_t blend_mode;
-    input_event_t injection;
-    uint8_t duration_frames;
-    bool active;
-} ai_injection_t;
-
-static ai_injection_t ai_injections[UART_HOST_MAX_PLAYERS];
-
 // Statistics
 static uint32_t rx_count = 0;
 static uint32_t error_count = 0;
@@ -64,6 +54,7 @@ static uart_host_mode_callback_t output_mode_callback = NULL;
 // Process a complete received packet
 static void process_packet(uint8_t type, const uint8_t* payload, uint8_t len)
 {
+    printf("[uart_host] rx type=0x%02X len=%u\n", type, (unsigned)len);
     switch (type) {
         case UART_PKT_NOP:
             // Keepalive, nothing to do
@@ -102,7 +93,6 @@ static void process_packet(uint8_t type, const uint8_t* payload, uint8_t len)
                 // Submit directly to router like USB/native inputs
                 router_submit_input(&event);
             }
-            // In AI_BLEND mode, inputs are stored and retrieved via uart_host_get_injection()
             break;
         }
 
@@ -120,51 +110,6 @@ static void process_packet(uint8_t type, const uint8_t* payload, uint8_t len)
 
             const uart_disconnect_event_t* disc = (const uart_disconnect_event_t*)payload;
             printf("[uart_host] Remote player %d disconnected\n", disc->player_index);
-
-            // Clear any AI injection for this player
-            if (disc->player_index < UART_HOST_MAX_PLAYERS) {
-                ai_injections[disc->player_index].active = false;
-                ai_injections[disc->player_index].blend_mode = UART_BLEND_OFF;
-            }
-            break;
-        }
-
-        case UART_PKT_AI_INJECT: {
-            if (len < sizeof(uart_ai_inject_t)) break;
-
-            const uart_ai_inject_t* inject = (const uart_ai_inject_t*)payload;
-
-            if (inject->player_index >= UART_HOST_MAX_PLAYERS) break;
-
-            ai_injection_t* ai = &ai_injections[inject->player_index];
-
-            ai->blend_mode = inject->blend_mode;
-            ai->active = (inject->blend_mode != UART_BLEND_OFF &&
-                         inject->blend_mode != UART_BLEND_OBSERVE);
-            ai->duration_frames = inject->duration_frames;
-
-            // Convert to input_event_t
-            init_input_event(&ai->injection);
-            ai->injection.buttons = inject->buttons;
-            ai->injection.analog[ANALOG_LX] = inject->analog[0];
-            ai->injection.analog[ANALOG_LY] = inject->analog[1];
-            ai->injection.analog[ANALOG_RX] = inject->analog[2];
-            ai->injection.analog[ANALOG_RY] = inject->analog[3];
-            ai->injection.analog[ANALOG_L2] = inject->analog[4];
-            ai->injection.analog[ANALOG_R2] = inject->analog[5];
-            break;
-        }
-
-        case UART_PKT_AI_BLEND_MODE: {
-            if (len < sizeof(uart_blend_mode_cmd_t)) break;
-
-            const uart_blend_mode_cmd_t* cmd = (const uart_blend_mode_cmd_t*)payload;
-
-            if (cmd->player_index >= UART_HOST_MAX_PLAYERS) break;
-
-            ai_injections[cmd->player_index].blend_mode = cmd->blend_mode;
-            ai_injections[cmd->player_index].active =
-                (cmd->blend_mode != UART_BLEND_OFF && cmd->blend_mode != UART_BLEND_OBSERVE);
             break;
         }
 
@@ -211,6 +156,16 @@ static void process_rx_byte(uint8_t byte)
                 rx_buffer[0] = byte;
                 rx_index = 1;
                 rx_state = RX_STATE_LENGTH;
+            } else {
+                static uint32_t junk_count = 0;
+                static uint32_t last_junk_log = 0;
+                junk_count++;
+                uint32_t now = to_ms_since_boot(get_absolute_time());
+                if (now - last_junk_log > 1000) {
+                    printf("[uart_host] junk: %lu non-sync bytes (last=0x%02X)\n",
+                           (unsigned long)junk_count, (unsigned)byte);
+                    last_junk_log = now;
+                }
             }
             break;
 
@@ -218,7 +173,8 @@ static void process_rx_byte(uint8_t byte)
             rx_length = byte;
             rx_buffer[rx_index++] = byte;
             if (rx_length > UART_PROTOCOL_MAX_PAYLOAD) {
-                // Invalid length, reset
+                printf("[uart_host] bad length %u (max %u)\n",
+                       (unsigned)rx_length, (unsigned)UART_PROTOCOL_MAX_PAYLOAD);
                 error_count++;
                 rx_state = RX_STATE_SYNC;
             } else {
@@ -256,7 +212,9 @@ static void process_rx_byte(uint8_t byte)
                 last_rx_time = to_ms_since_boot(get_absolute_time());
                 process_packet(rx_type, &rx_buffer[UART_HEADER_SIZE], rx_length);
             } else {
-                // CRC mismatch
+                printf("[uart_host] CRC fail type=0x%02X len=%u got=0x%02X want=0x%02X\n",
+                       (unsigned)rx_type, (unsigned)rx_length,
+                       (unsigned)received_crc, (unsigned)calculated_crc);
                 crc_errors++;
                 error_count++;
             }
@@ -295,7 +253,6 @@ void uart_host_init_pins(uint8_t tx_pin, uint8_t rx_pin, uint32_t baud)
     uart_set_fifo_enabled(uart_port, true);
 
     // Initialize state
-    memset(ai_injections, 0, sizeof(ai_injections));
     rx_state = RX_STATE_SYNC;
     rx_index = 0;
 
@@ -307,20 +264,15 @@ void uart_host_task(void)
 {
     if (!initialized) return;
 
-    // Process all available bytes from UART
-    while (uart_is_readable(uart_port)) {
-        uint8_t byte = uart_getc(uart_port);
-        process_rx_byte(byte);
-    }
-
-    // Decrement injection duration counters
-    for (int i = 0; i < UART_HOST_MAX_PLAYERS; i++) {
-        if (ai_injections[i].active && ai_injections[i].duration_frames > 0) {
-            ai_injections[i].duration_frames--;
-            if (ai_injections[i].duration_frames == 0) {
-                ai_injections[i].active = false;
-            }
-        }
+    // Drain bytes via stdio's buffered stdin. pico_enable_stdio_uart owns
+    // the UART RX path via stdio_uart_in_chars (polling-based — bytes stay
+    // in the hardware FIFO until something pulls). Going through stdin keeps
+    // us compatible with the same surface other apps use for their 'B' →
+    // bootloader idiom, so a single UART can carry both protocol packets
+    // and the manual reset escape.
+    int c;
+    while ((c = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) {
+        process_rx_byte((uint8_t)c);
     }
 }
 
@@ -332,29 +284,6 @@ void uart_host_set_mode(uart_host_mode_t mode)
 uart_host_mode_t uart_host_get_mode(void)
 {
     return host_mode;
-}
-
-bool uart_host_get_injection(uint8_t player_index, input_event_t* out)
-{
-    if (!initialized) return false;
-    if (player_index >= UART_HOST_MAX_PLAYERS) return false;
-
-    ai_injection_t* ai = &ai_injections[player_index];
-
-    if (!ai->active) return false;
-    if (ai->blend_mode == UART_BLEND_OFF) return false;
-    if (ai->blend_mode == UART_BLEND_OBSERVE) return false;
-
-    *out = ai->injection;
-    return true;
-}
-
-uart_blend_mode_t uart_host_get_blend_mode(uint8_t player_index)
-{
-    if (!initialized) return UART_BLEND_OFF;
-    if (player_index >= UART_HOST_MAX_PLAYERS) return UART_BLEND_OFF;
-
-    return ai_injections[player_index].blend_mode;
 }
 
 bool uart_host_is_connected(void)
