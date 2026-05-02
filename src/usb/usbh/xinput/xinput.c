@@ -9,6 +9,7 @@
 #include "xinput_host.h"
 #include "chatpad.h"
 #include "core/input_event.h"
+#include "usb/usbd/usbd.h"  // for usbd_get_mode() / USB_OUTPUT_MODE_XBONE
 
 // Xbox One auth passthrough - weak stubs for non-USB-device builds
 // These are overridden by xbone_auth.c when linked (usb2usb build)
@@ -166,6 +167,19 @@ void tuh_xinput_mount_cb(uint8_t dev_addr, uint8_t instance, const xinputh_inter
   {
     printf("[xinput] Xbox One controller detected - registering for auth passthrough\n");
     xbone_auth_register(dev_addr, instance);
+  }
+
+  // When we're outputting as Xbox One to the console, refuse to send any
+  // Xbox-360-specific commands to the dongle. Mode-cycling adapters like
+  // Mayflash Magic-X interpret Xbox-360 LED/init traffic as "host is Xbox 360"
+  // and lock onto Xbox 360 identity. Staying silent makes them cycle to the
+  // next identity (eventually Xbox One).
+  bool ignore_for_mode_cycle = (usbd_get_mode() == USB_OUTPUT_MODE_XBONE) &&
+                               (xinput_itf->type != XBOXONE);
+  if (ignore_for_mode_cycle) {
+    printf("[xinput] Output is XBONE — not initializing type=%d, hoping dongle cycles\n",
+           xinput_itf->type);
+    return;
   }
 
   // If this is a Xbox 360 Wireless controller we need to wait for a connection packet
