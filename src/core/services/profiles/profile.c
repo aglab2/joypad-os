@@ -825,11 +825,8 @@ void profile_apply(const profile_t* profile,
         if (distPhi < deadzoneAnglePart)
         {
             float r = sqrtf(arr[0] * arr[0] + arr[1] * arr[1]);
-            if (r > 127.f)
-            {
-                r = 127.f;
-            }
-
+            r /= 127.f;
+            r *= 100.f;
             arr[0] = r * cosf(roundedPhi);
             arr[1] = r * sinf(roundedPhi);
             output->left_x = 128.f + arr[0];
