@@ -822,16 +822,20 @@ void profile_apply(const profile_t* profile,
         float roundedPhi = part * anglePart;
         float distPhi = fabsf(roundedPhi - phi);
 
+        arr[0] /= 127.f;
+        arr[1] /= 127.f;
+        arr[0] *= 100.f;
+        arr[1] *= 100.f;
+
         if (distPhi < deadzoneAnglePart)
         {
             float r = sqrtf(arr[0] * arr[0] + arr[1] * arr[1]);
-            r /= 127.f;
-            r *= 100.f;
             arr[0] = r * cosf(roundedPhi);
             arr[1] = r * sinf(roundedPhi);
-            output->left_x = 128.f + arr[0];
-            output->left_y = 128.f + arr[1];
         }
+
+        output->left_x = 128.f + arr[0];
+        output->left_y = 128.f + arr[1];
     }
 
     // Apply right stick sensitivity scaling
