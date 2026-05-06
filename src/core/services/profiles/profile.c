@@ -817,7 +817,7 @@ void profile_apply(const profile_t* profile,
 
         const float anglePart = 2 * 3.14159265f / 8;
         const int part = roundf(phi / anglePart);
-        const float size = (part == 2 || part == -2) ? 0.02f : 0.04f;
+        const float size = (part == 2 || part == -2) ? 0.04f : 0.1f;
         const float deadzoneAnglePart = anglePart * size;
         float roundedPhi = part * anglePart;
         float distPhi = fabsf(roundedPhi - phi);
